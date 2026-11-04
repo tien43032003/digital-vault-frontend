@@ -152,14 +152,15 @@ describe('OwnerPlansPage current subscription', () => {
     }
   })
 
-  it('render_LastFiveDays_ShowsReminderAndOpensRenewAndNextPeriodForAllPaidPlans', async () => {
+  it('render_LastFiveDays_ShowsReminderOpensRenewAndShowsNextPeriodComingSoon', async () => {
     seedSubscription(2, 27)
     renderPage()
     await screen.findByText('Đang dùng')
     expect(await screen.findByText(/còn 3 ngày nữa là hết hạn/)).toBeInTheDocument()
     expect(within(plan('Nâng cao')).getByRole('button', { name: 'Gia hạn gói' })).toHaveAttribute('href', '/owner/plans/2/checkout')
-    expect(within(plan('Gia đình')).getByRole('button', { name: 'Đăng ký kỳ sau' })).toHaveAttribute('href', '/owner/plans/3/checkout')
-    expect(within(plan('Cơ bản')).getByRole('button', { name: 'Đăng ký kỳ sau' })).toHaveAttribute('href', '/owner/plans/1/checkout')
+    expect(within(plan('Gia đình')).getByRole('button', { name: 'Đăng ký kỳ sau (sắp có)' })).toBeDisabled()
+    expect(within(plan('Cơ bản')).getByRole('button', { name: 'Đăng ký kỳ sau (sắp có)' })).toBeDisabled()
+    expect(plan('Cơ bản')).toHaveTextContent('sau khi gói hiện tại kết thúc')
     expect(within(plan('Miễn phí')).getByRole('button', { name: 'Dùng miễn phí' })).toBeDisabled()
   })
 

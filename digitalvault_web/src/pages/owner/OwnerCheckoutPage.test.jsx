@@ -83,13 +83,13 @@ describe('OwnerCheckoutPage summary', () => {
     expect(screen.getByRole('button', { name: 'Kích hoạt gói miễn phí' })).toBeDisabled()
   })
 
-  it('render_HasOtherActivePlan_WarnsCurrentPlanWillBeReplaced', async () => {
+  it('render_RenewingInLastDays_WarnsNewPeriodReplacesCurrentOne', async () => {
     getDb().userSubscriptions = [
-      { subscriptionId: 1, userId: demoUserId(), planId: 1, status: 'Active', startDate: new Date(Date.now() - 27 * DAY).toISOString(), endDate: new Date(Date.now() + 3 * DAY).toISOString() },
+      { subscriptionId: 1, userId: demoUserId(), planId: 2, status: 'Active', startDate: new Date(Date.now() - 27 * DAY).toISOString(), endDate: new Date(Date.now() + 3 * DAY).toISOString() },
     ]
     renderCheckout()
-    expect(await screen.findByRole('alert')).toHaveTextContent('Bạn đang dùng gói Cơ bản')
-    expect(screen.getByRole('alert')).toHaveTextContent('gói Nâng cao có hiệu lực ngay')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Bạn đang dùng gói Nâng cao')
+    expect(screen.getByRole('alert')).toHaveTextContent('kích hoạt một kỳ mới')
   })
 
   it('render_PlanLockedByChangeRules_ShowsReasonInsteadOfPayment', async () => {

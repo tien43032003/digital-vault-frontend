@@ -60,7 +60,8 @@ export function getPlanChange({ plan, subscription, scheduled = null, now = Date
       return result('scheduled', false, label, false, `Bạn đã đăng ký gói ${scheduled.plan.planName} cho kỳ sau, bắt đầu ngày ${formatPaymentDate(scheduled.startDate)}.`)
     }
     if (same) return result('renew', true, 'Gia hạn gói', true)
-    return result('next-period', true, 'Đăng ký kỳ sau', false)
+    if (support.scheduledNextPeriod) return result('next-period', true, 'Đăng ký kỳ sau', false)
+    return result('next-period-pending', false, 'Đăng ký kỳ sau (sắp có)', false, 'Gói mới sẽ bắt đầu tính sau khi gói hiện tại kết thúc. Tính năng này sắp được mở.')
   }
 
   const sinceStart = now - time(active.startDate)

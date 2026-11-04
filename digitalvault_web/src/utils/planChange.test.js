@@ -113,9 +113,18 @@ describe('getPlanChange in the last 5 days (renewal window)', () => {
     expect(change(PREMIUM, sub)).toMatchObject({ type: 'renew', allowed: true, label: 'Gia hạn gói', primary: true })
   })
 
-  it('anyOtherPaidPlanIncludingLowerOnes_IsAllowedForNextPeriod', () => {
+  it('anyOtherPaidPlanIncludingLowerOnes_WhenBackendCannotQueueYet_IsShownAsComingSoon', () => {
     for (const plan of [STANDARD, VIP]) {
-      expect(change(plan, sub)).toMatchObject({ type: 'next-period', allowed: true, label: 'Đăng ký kỳ sau', primary: false })
+      const result = change(plan, sub)
+      expect(result).toMatchObject({ type: 'next-period-pending', allowed: false, label: 'Đăng ký kỳ sau (sắp có)', primary: false })
+      expect(result.reason).toContain('sau khi gói hiện tại kết thúc')
+    }
+  })
+
+  it('anyOtherPaidPlanIncludingLowerOnes_WhenBackendCanQueue_IsAllowedForNextPeriod', () => {
+    const support = { upgradeDifference: false, scheduledNextPeriod: true }
+    for (const plan of [STANDARD, VIP]) {
+      expect(change(plan, sub, { support })).toMatchObject({ type: 'next-period', allowed: true, label: 'Đăng ký kỳ sau', primary: false })
     }
   })
 
