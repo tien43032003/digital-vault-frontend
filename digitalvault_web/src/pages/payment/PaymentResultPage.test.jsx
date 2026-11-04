@@ -196,3 +196,23 @@ describe('PaymentResultPage links', () => {
     expect(await screen.findByText('landing-page')).toBeInTheDocument()
   })
 })
+
+describe('PaymentResultPage signed-in navigation', () => {
+  it('links_SignedInOwner_OffersWorkspaceInsteadOfHomeSoItDoesNotLookLikeLogout', async () => {
+    await asLoggedInUser()
+    sessionStorage.setItem('aeterna.user', JSON.stringify({ userId: 1, roles: ['Owner'], email: 'owner@example.com' }))
+    seedTransaction('Success')
+    renderPage(`?status=Success&code=${CODE}`)
+    await heading('Thanh toán thành công')
+    expect(await screen.findByRole('link', { name: 'Vào khu làm việc' })).toHaveAttribute('href', '/owner/assets')
+    expect(screen.queryByRole('link', { name: 'Về trang chủ' })).not.toBeInTheDocument()
+  })
+
+  it('links_SignedInOwnerOnInvalidLink_AlsoOffersWorkspace', async () => {
+    await asLoggedInUser()
+    sessionStorage.setItem('aeterna.user', JSON.stringify({ userId: 1, roles: ['Owner'], email: 'owner@example.com' }))
+    renderPage('')
+    await heading('Không có thông tin thanh toán')
+    expect(await screen.findByRole('link', { name: 'Vào khu làm việc' })).toBeInTheDocument()
+  })
+})
