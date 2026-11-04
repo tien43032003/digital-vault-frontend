@@ -25,6 +25,7 @@ import AdminPlansPage from './pages/admin/AdminPlansPage'
 import MockVnpayGatewayPage from './pages/payment/MockVnpayGatewayPage'
 import OwnerPlansPage from './pages/owner/OwnerPlansPage'
 import OwnerCheckoutPage from './pages/owner/OwnerCheckoutPage'
+import PaymentResultPage from './pages/payment/PaymentResultPage'
 import VnpayReturnPage from './pages/payment/VnpayReturnPage'
 import { MOCK_MODE } from './mocks/mode'
 import AdminRolesPage from './pages/admin/AdminRolesPage'
@@ -58,6 +59,8 @@ function App() {
 
           {/* Công khai: VNPay đưa khách về đây sau khi thanh toán, nên không bắt đăng nhập */}
           <Route path="/payment/vnpay-return" element={<VnpayReturnPage />} />
+          {/* Công khai: BE (GET /payments/vnpay/return) chuyển khách về đây kèm status và code sau khi VNPay trả kết quả */}
+          <Route path="/payment-result" element={<PaymentResultPage />} />
           {/* Công khai: BE chuyển trình duyệt về đây sau khi Google xác thực xong (Google:FrontendCallbackUrl) */}
           <Route path="/auth/google/callback" element={<GoogleCallbackPage />} />
           {MOCK_MODE !== 'off' && <Route path="/payment/mock-vnpay" element={<MockVnpayGatewayPage />} />}
