@@ -19,3 +19,9 @@ export async function confirmVnpayReturn(params) {
   const { data } = await axiosClient.get('/payments/vnpay/return', { params })
   return data
 }
+
+// Gói đang dùng của chính người dùng: { hasActiveSubscription, subscription }; chưa mua gói nào thì hasActiveSubscription = false
+export async function getCurrentSubscription() {
+  const { data } = await axiosClient.get('/payments/me/subscription')
+  return data
+}

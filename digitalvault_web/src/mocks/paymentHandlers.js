@@ -26,6 +26,19 @@ function newTransactionCode() {
 
 export const paymentHandlers = [
   http.get(
+    '*/api/payments/me/subscription',
+    route(({ userId }) => {
+      const db = getDb()
+      const subscribed = !db.requireSubscription || (db.subscribedUserIds ?? []).includes(userId)
+      return HttpResponse.json(
+        subscribed
+          ? { hasActiveSubscription: true, subscription: { subscriptionId: 1, status: 'Active', startDate: new Date().toISOString(), endDate: new Date(Date.now() + 30 * 86400000).toISOString(), plan: PLANS[0] } }
+          : { hasActiveSubscription: false, subscription: null },
+      )
+    }),
+  ),
+
+  http.get(
     '*/api/payments/plans',
     route(() => HttpResponse.json([...PLANS].sort((a, b) => a.price - b.price)), { auth: false }),
   ),

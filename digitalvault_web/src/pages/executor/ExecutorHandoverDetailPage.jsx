@@ -21,6 +21,7 @@ import LegalVerificationForm from '../../components/executor/LegalVerificationFo
 import { useHandover } from '../../hooks/useHandover'
 import { useVaultName } from '../../hooks/useVaultName'
 import { MOCK_MODE } from '../../mocks/mode'
+import { formatAllocation } from '../../utils/catalog'
 import { downloadBlob } from '../../utils/download'
 import { handoverOwnerName, vaultLabel } from '../../utils/executor'
 import { handoverActionErrorMessage, handoverCode, isEditableStatus } from '../../utils/handover'
@@ -181,6 +182,7 @@ export default function ExecutorHandoverDetailPage({ mockMode = MOCK_MODE }) {
                     <tr className="fs-11 text-slate-500">
                       <th scope="col">Tài sản</th>
                       <th scope="col">Người thụ hưởng</th>
+                      <th scope="col" className="text-end">Tỉ lệ phân bổ</th>
                       <th scope="col">Trạng thái</th>
                     </tr>
                   </thead>
@@ -188,7 +190,8 @@ export default function ExecutorHandoverDetailPage({ mockMode = MOCK_MODE }) {
                     {handover.cases.map((item) => (
                       <tr key={item.handoverId}>
                         <td>{item.assetName ?? `Tài sản #${item.assetId}`}</td>
-                        <td>{`Người thụ hưởng #${item.beneficiaryId}`}</td>
+                        <td>{item.beneficiaryName ?? `Người thụ hưởng #${item.beneficiaryId}`}</td>
+                        <td className="text-end fw-semibold text-ink">{item.allocationPercentage == null ? '—' : formatAllocation(item.allocationPercentage)}</td>
                         <td>{CASE_STATUS_LABELS[item.status] ?? item.status}</td>
                       </tr>
                     ))}
