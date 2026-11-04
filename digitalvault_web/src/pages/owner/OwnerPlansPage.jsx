@@ -9,12 +9,14 @@ import CurrentSubscriptionPanel from '../../components/payment/CurrentSubscripti
 import PaymentHistoryPanel from '../../components/payment/PaymentHistoryPanel'
 import { useAdminResource } from '../../hooks/useAdminResource'
 import { MOCK_MODE } from '../../mocks/mode'
-import { formatDuration, formatPlanPrice, formatStorage, planAction } from '../../utils/payment'
+import { formatDuration, formatPlanPrice, formatStorage } from '../../utils/payment'
+import { getPlanChange, renewalReminder } from '../../utils/planChange'
 
 // Thẻ một gói: giá, thời hạn, giới hạn và nút Mua / Nâng cấp / Gia hạn sang màn hình thanh toán
-function PlanCard({ plan, currentPlan }) {
+function PlanCard({ plan, subscription, now }) {
+  const currentPlan = subscription?.plan ?? null
   const isCurrent = Boolean(currentPlan) && currentPlan.planId === plan.planId
-  const action = planAction(plan, currentPlan)
+  const change = getPlanChange({ plan, subscription, now })
   return (
     <article
       className="av-panel d-flex flex-column gap-3 h-100"
@@ -48,14 +50,25 @@ function PlanCard({ plan, currentPlan }) {
           {`Dung lượng ${formatStorage(plan.maxStorageBytes)}`}
         </li>
       </ul>
-      {action ? (
-        <Button as={Link} to={`/owner/plans/${plan.planId}/checkout`} variant={action.primary ? 'primary' : 'light'} className={`av-btn av-btn-md${action.primary ? '' : ' border'}`}>
-          {action.label}
-        </Button>
-      ) : (
+      {isCurrent && !change.allowed && change.type !== 'locked-renew' && change.type !== 'scheduled' ? (
         <Button type="button" variant="light" className="av-btn av-btn-md border" disabled>
           Đang sử dụng
         </Button>
+      ) : change.allowed ? (
+        <Button as={Link} to={`/owner/plans/${plan.planId}/checkout`} variant={change.primary ? 'primary' : 'light'} className={`av-btn av-btn-md${change.primary ? '' : ' border'}`}>
+          {change.label}
+        </Button>
+      ) : (
+        <>
+          <Button type="button" variant="light" className="av-btn av-btn-md border" disabled aria-describedby={`plan-lock-${plan.planId}`}>
+            {change.label}
+          </Button>
+          {change.reason && (
+            <p id={`plan-lock-${plan.planId}`} className="mb-0 fs-12 text-slate-500">
+              {change.reason}
+            </p>
+          )}
+        </>
       )}
     </article>
   )
@@ -69,7 +82,10 @@ export default function OwnerPlansPage({ mockMode = MOCK_MODE }) {
   const [notice, setNotice] = useState(() => location.state?.notice ?? '')
   const { data: plans, error, loading, reload } = useAdminResource(getPlans)
   const subscription = useAdminResource(getMySubscription)
-  const currentPlan = subscription.data?.hasActiveSubscription ? (subscription.data.subscription?.plan ?? null) : null
+  const activeSubscription = subscription.data?.hasActiveSubscription ? (subscription.data.subscription ?? null) : null
+  // Mốc giờ cố định theo lần mở trang (bấm Làm mới thì cập nhật), tránh gọi hàm không thuần khi render
+  const [now, setNow] = useState(() => Date.now())
+  const reminder = renewalReminder(activeSubscription, now)
 
   // Xoá state khỏi lịch sử để F5 không hiện lại thông báo cũ
   useEffect(() => {
@@ -77,6 +93,7 @@ export default function OwnerPlansPage({ mockMode = MOCK_MODE }) {
   }, [location.state, location.pathname, navigate])
 
   const refresh = () => {
+    setNow(Date.now())
     reload()
     subscription.reload()
   }
@@ -109,6 +126,12 @@ export default function OwnerPlansPage({ mockMode = MOCK_MODE }) {
         </Alert>
       )}
 
+      {reminder.show && (
+        <Alert variant="warning" className="av-alert mb-0" role="status">
+          {`Gói ${activeSubscription.plan.planName} của bạn còn ${reminder.daysLeft} ngày nữa là hết hạn. Hãy gia hạn hoặc chọn gói cho kỳ sau; gói mới sẽ bắt đầu tính sau khi gói hiện tại kết thúc.`}
+        </Alert>
+      )}
+
       <CurrentSubscriptionPanel data={subscription.data} error={subscription.error} loading={subscription.loading} onRetry={subscription.reload} />
 
       <AdminResourceState error={error} loading={loading} hasData={Boolean(plans)} loadingText="Đang tải các gói dịch vụ..." onRetry={reload} />
@@ -119,7 +142,7 @@ export default function OwnerPlansPage({ mockMode = MOCK_MODE }) {
         <div className="row g-3">
           {plans.map((plan) => (
             <div key={plan.planId} className="col-12 col-md-6 col-xl-4">
-              <PlanCard plan={plan} currentPlan={currentPlan} />
+              <PlanCard plan={plan} subscription={activeSubscription} now={now} />
             </div>
           ))}
         </div>

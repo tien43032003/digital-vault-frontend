@@ -85,11 +85,21 @@ describe('OwnerCheckoutPage summary', () => {
 
   it('render_HasOtherActivePlan_WarnsCurrentPlanWillBeReplaced', async () => {
     getDb().userSubscriptions = [
-      { subscriptionId: 1, userId: demoUserId(), planId: 1, status: 'Active', startDate: new Date(Date.now() - DAY).toISOString(), endDate: new Date(Date.now() + 29 * DAY).toISOString() },
+      { subscriptionId: 1, userId: demoUserId(), planId: 1, status: 'Active', startDate: new Date(Date.now() - 27 * DAY).toISOString(), endDate: new Date(Date.now() + 3 * DAY).toISOString() },
     ]
     renderCheckout()
     expect(await screen.findByRole('alert')).toHaveTextContent('Bạn đang dùng gói Cơ bản')
     expect(screen.getByRole('alert')).toHaveTextContent('gói Nâng cao có hiệu lực ngay')
+  })
+
+  it('render_PlanLockedByChangeRules_ShowsReasonInsteadOfPayment', async () => {
+    getDb().userSubscriptions = [
+      { subscriptionId: 1, userId: demoUserId(), planId: 1, status: 'Active', startDate: new Date(Date.now() - 10 * DAY).toISOString(), endDate: new Date(Date.now() + 20 * DAY).toISOString() },
+    ]
+    renderCheckout()
+    expect(await screen.findByRole('heading', { name: 'Chưa thể chọn gói này' })).toBeInTheDocument()
+    expect(screen.getByText(/Quá 3 ngày đầu/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Thanh toán/ })).not.toBeInTheDocument()
   })
 })
 
