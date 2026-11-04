@@ -21,9 +21,10 @@ afterAll(() => server.close())
 const demoUserId = () => getDb().users.find((user) => user.email === DEMO_ACCOUNT.email).userId
 const DAY = 24 * 60 * 60 * 1000
 
-const seedSubscription = (planId = 2) => {
+// elapsedDays: gói đã chạy bao nhiêu ngày (mặc định 10 ngày: giữa kỳ, các nút đổi gói bị khoá); gói dài 30 ngày
+const seedSubscription = (planId = 2, elapsedDays = 10) => {
   getDb().userSubscriptions = [
-    { subscriptionId: 1, userId: demoUserId(), planId, status: 'Active', startDate: new Date(Date.now() - 10 * DAY).toISOString(), endDate: new Date(Date.now() + 20 * DAY).toISOString() },
+    { subscriptionId: 1, userId: demoUserId(), planId, status: 'Active', startDate: new Date(Date.now() - elapsedDays * DAY).toISOString(), endDate: new Date(Date.now() + (30 - elapsedDays) * DAY).toISOString() },
   ]
 }
 
@@ -137,7 +138,9 @@ describe('OwnerPlansPage current subscription', () => {
     expect(panel).toHaveTextContent('Còn 20 ngày')
     await screen.findByRole('article', { name: 'Nâng cao' })
     expect(within(plan('Nâng cao')).getByText('Đang dùng')).toBeInTheDocument()
-    expect(within(plan('Nâng cao')).getByRole('button', { name: 'Gia hạn gói' })).toHaveAttribute('href', '/owner/plans/2/checkout')
+    // Đang giữa kỳ nên chưa gia hạn được: nút khoá kèm lý do
+    expect(within(plan('Nâng cao')).getByRole('button', { name: 'Gia hạn gói' })).toBeDisabled()
+    expect(within(plan('Nâng cao')).getByRole('button', { name: 'Gia hạn gói' })).not.toHaveAttribute('href')
     expect(within(plan('Cơ bản')).queryByText('Đang dùng')).not.toBeInTheDocument()
   })
 
@@ -149,12 +152,36 @@ describe('OwnerPlansPage current subscription', () => {
     }
   })
 
-  it('render_ActiveSubscription_OffersUpgradeForPricierAndSwitchForCheaperPlans', async () => {
+  it('render_LastFiveDays_ShowsReminderAndOpensRenewAndNextPeriodForAllPaidPlans', async () => {
+    seedSubscription(2, 27)
+    renderPage()
+    await screen.findByText('Đang dùng')
+    expect(await screen.findByText(/còn 3 ngày nữa là hết hạn/)).toBeInTheDocument()
+    expect(within(plan('Nâng cao')).getByRole('button', { name: 'Gia hạn gói' })).toHaveAttribute('href', '/owner/plans/2/checkout')
+    expect(within(plan('Gia đình')).getByRole('button', { name: 'Đăng ký kỳ sau' })).toHaveAttribute('href', '/owner/plans/3/checkout')
+    expect(within(plan('Cơ bản')).getByRole('button', { name: 'Đăng ký kỳ sau' })).toHaveAttribute('href', '/owner/plans/1/checkout')
+    expect(within(plan('Miễn phí')).getByRole('button', { name: 'Dùng miễn phí' })).toBeDisabled()
+  })
+
+  it('render_MiddleOfPeriod_LocksOtherPlansWithReasonAndNoReminder', async () => {
     seedSubscription(2)
     renderPage()
     await screen.findByText('Đang dùng')
-    expect(within(plan('Gia đình')).getByRole('button', { name: 'Nâng cấp' })).toHaveAttribute('href', '/owner/plans/3/checkout')
-    expect(within(plan('Cơ bản')).getByRole('button', { name: 'Chuyển gói' })).toHaveAttribute('href', '/owner/plans/1/checkout')
+    expect(screen.queryByText(/nữa là hết hạn/)).not.toBeInTheDocument()
+    const upgrade = within(plan('Gia đình')).getByRole('button', { name: 'Nâng cấp' })
+    expect(upgrade).toBeDisabled()
+    expect(plan('Gia đình')).toHaveTextContent('Quá 3 ngày đầu')
+    expect(within(plan('Cơ bản')).getByRole('button', { name: 'Chuyển gói' })).toBeDisabled()
+  })
+
+  it('render_FirstThreeDays_HigherPlanShowsComingSoonAndLowerPlanIsLocked', async () => {
+    seedSubscription(2, 1)
+    renderPage()
+    await screen.findByText('Đang dùng')
+    expect(within(plan('Gia đình')).getByRole('button', { name: 'Nâng cấp (sắp có)' })).toBeDisabled()
+    expect(plan('Gia đình')).toHaveTextContent('phần chênh lệch')
+    expect(within(plan('Cơ bản')).getByRole('button', { name: 'Chuyển gói' })).toBeDisabled()
+    expect(plan('Cơ bản')).toHaveTextContent('chỉ chọn được khi gói hiện tại sắp hết hạn')
   })
 })
 

@@ -25,6 +25,7 @@ import {
   PAYMENT_METHODS,
   savePendingCheckout,
 } from '../../utils/payment'
+import { getPlanChange } from '../../utils/planChange'
 
 const METHOD_ICONS = { VNPay: Landmark, MoMo: Wallet, BankTransfer: Building2 }
 
@@ -112,6 +113,11 @@ export default function OwnerCheckoutPage({ mockMode = MOCK_MODE, qrPollMs = QR_
 
   const free = isFreePlan(plan)
   const current = data.subscription?.hasActiveSubscription ? data.subscription.subscription : null
+  // Gõ thẳng địa chỉ thanh toán cũng không vượt được quy tắc đổi gói (BE vẫn kiểm tra lại)
+  const change = getPlanChange({ plan, subscription: current })
+  if (!change.allowed) {
+    return <Unavailable title="Chưa thể chọn gói này" message={change.reason ?? 'Gói này hiện không thể chọn. Hãy quay lại danh sách gói.'} />
+  }
   const renewing = current?.plan?.planId === plan.planId
   const canPay = agreed && (free || method === 'VNPay') && paying === null
 
