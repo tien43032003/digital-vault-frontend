@@ -53,3 +53,54 @@ describe('LandingPage register flow', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Đăng ký thành công')
   })
 })
+
+describe('LandingPage signed-in visitor', () => {
+  const STORED_KEY = 'aeterna.user'
+
+  const renderAsSignedIn = async (roles) => {
+    const authApi = await import('../callapi/authApi')
+    sessionStorage.setItem(STORED_KEY, JSON.stringify({ userId: 1, roles, email: 'an@example.com' }))
+    authApi.checkSession.mockResolvedValue({ userId: 1, fullName: 'An', email: 'an@example.com', roles })
+    return renderWithProviders(<LandingPage />, {
+      extraRoutes: [
+        { path: '/owner/assets', element: <p>owner-assets-page</p> },
+        { path: '/admin', element: <p>admin-portal-page</p> },
+        { path: '/beneficiary', element: <p>beneficiary-portal-page</p> },
+      ],
+    })
+  }
+
+  afterEach(() => sessionStorage.clear())
+
+  it('visit_SignedInOwner_GoesStraightToOwnerWorkspaceInsteadOfShowingLogin', async () => {
+    await renderAsSignedIn(['Owner'])
+    expect(await screen.findByText('owner-assets-page')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Đăng Nhập Cổng An Toàn' })).not.toBeInTheDocument()
+  })
+
+  it('visit_SignedInAdmin_GoesToAdminPortal', async () => {
+    await renderAsSignedIn(['Admin'])
+    expect(await screen.findByText('admin-portal-page')).toBeInTheDocument()
+  })
+
+  it('visit_SignedInWithoutAnyRole_StaysOnLandingBecauseThereIsNowhereToGo', async () => {
+    await renderAsSignedIn([])
+    expect(await screen.findByRole('heading', { name: 'Đăng Nhập Cổng An Toàn' })).toBeInTheDocument()
+  })
+
+  it('visit_WhileCheckingSavedSession_ShowsCheckingMessageInsteadOfFlashingLogin', async () => {
+    await renderAsSignedIn(['Owner'])
+    expect(screen.getByRole('status')).toHaveTextContent('Đang kiểm tra phiên đăng nhập')
+    expect(screen.queryByRole('heading', { name: 'Đăng Nhập Cổng An Toàn' })).not.toBeInTheDocument()
+    await screen.findByText('owner-assets-page')
+  })
+
+  it('visit_SavedSessionExpired_ShowsLoginForm', async () => {
+    const authApi = await import('../callapi/authApi')
+    sessionStorage.setItem(STORED_KEY, JSON.stringify({ userId: 1, roles: ['Owner'], email: 'an@example.com' }))
+    authApi.checkSession.mockResolvedValue(null)
+    renderWithProviders(<LandingPage />, { extraRoutes: [{ path: '/owner/assets', element: <p>owner-assets-page</p> }] })
+    expect(await screen.findByRole('heading', { name: 'Đăng Nhập Cổng An Toàn' })).toBeInTheDocument()
+    expect(screen.queryByText('owner-assets-page')).not.toBeInTheDocument()
+  })
+})

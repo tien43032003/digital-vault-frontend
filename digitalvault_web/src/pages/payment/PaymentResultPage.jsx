@@ -5,7 +5,10 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { getMyTransactions } from '../../callapi/paymentApi'
 import BrandLogo from '../../components/common/BrandLogo'
 import { useAdminResource } from '../../hooks/useAdminResource'
+import { useAuth } from '../../hooks/useAuth'
 import { formatPaymentDateTime, formatVnd } from '../../utils/payment'
+import { getPortalPreference } from '../../utils/portalPreference'
+import { getDefaultRouteForRoles } from '../../utils/roleRoutes'
 import { getTokens } from '../../utils/tokenStorage'
 
 const OUTCOME = {
@@ -32,12 +35,13 @@ function Shell({ children }) {
   )
 }
 
-function Links({ showLogin = false }) {
+// workspace là khu làm việc của người đã đăng nhập: có thì dẫn thẳng vào đó, vì "trang chủ" là trang giới thiệu nên dễ tưởng đã bị đăng xuất
+function Links({ showLogin = false, workspace = null }) {
   return (
     <div className="d-flex flex-wrap justify-content-center gap-3 fs-13">
       {showLogin && <Link to="/">Đăng nhập để đối chiếu</Link>}
       <Link to="/owner/plans">Xem các gói dịch vụ</Link>
-      <Link to="/">Về trang chủ</Link>
+      {workspace ? <Link to={workspace}>Vào khu làm việc</Link> : <Link to="/">Về trang chủ</Link>}
     </div>
   )
 }
@@ -51,6 +55,8 @@ async function findMyTransaction(code) {
 // Trang BE chuyển khách về sau khi VNPay trả kết quả: /payment-result?status=...&code=...
 // status và code nằm trên địa chỉ nên ai cũng sửa tay được: khi đã đăng nhập, FE đối chiếu với lịch sử giao dịch của tài khoản và tin kết quả của máy chủ.
 export default function PaymentResultPage({ pollIntervalMs = 3000, maxPolls = 10 }) {
+  const { user } = useAuth()
+  const workspace = user ? getDefaultRouteForRoles(user.roles, getPortalPreference()) : null
   const [searchParams] = useSearchParams()
   const queryStatus = searchParams.get('status')
   const code = searchParams.get('code')
@@ -86,7 +92,7 @@ export default function PaymentResultPage({ pollIntervalMs = 3000, maxPolls = 10
           Không có thông tin thanh toán
         </h1>
         <p className="mb-0 fs-13 text-slate-500">Địa chỉ này không chứa kết quả thanh toán hợp lệ. Hãy chọn gói dịch vụ và thanh toán lại.</p>
-        <Links />
+        <Links workspace={workspace} />
       </Shell>
     )
   }
@@ -112,7 +118,7 @@ export default function PaymentResultPage({ pollIntervalMs = 3000, maxPolls = 10
           </h1>
           <p className="mb-0 fs-13 text-slate-500">Giao dịch này không thuộc tài khoản đang đăng nhập hoặc chưa được ghi nhận.</p>
         </div>
-        <Links />
+        <Links workspace={workspace} />
       </Shell>
     )
   }
@@ -171,7 +177,7 @@ export default function PaymentResultPage({ pollIntervalMs = 3000, maxPolls = 10
           </>
         )}
       </dl>
-      <Links showLogin={unauthenticated} />
+      <Links showLogin={unauthenticated} workspace={workspace} />
     </Shell>
   )
 }
