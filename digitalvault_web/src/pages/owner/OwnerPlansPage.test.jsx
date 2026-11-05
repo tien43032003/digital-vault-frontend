@@ -22,9 +22,10 @@ const demoUserId = () => getDb().users.find((user) => user.email === DEMO_ACCOUN
 const DAY = 24 * 60 * 60 * 1000
 
 // elapsedDays: gói đã chạy bao nhiêu ngày (mặc định 10 ngày: giữa kỳ, các nút đổi gói bị khoá); gói dài 30 ngày
-const seedSubscription = (planId = 2, elapsedDays = 10) => {
+const seedSubscription = (planId = 2, elapsedDays = 10, extra = []) => {
   getDb().userSubscriptions = [
     { subscriptionId: 1, userId: demoUserId(), planId, status: 'Active', startDate: new Date(Date.now() - elapsedDays * DAY).toISOString(), endDate: new Date(Date.now() + (30 - elapsedDays) * DAY).toISOString() },
+    ...extra,
   ]
 }
 
@@ -152,15 +153,14 @@ describe('OwnerPlansPage current subscription', () => {
     }
   })
 
-  it('render_LastFiveDays_ShowsReminderOpensRenewAndShowsNextPeriodComingSoon', async () => {
+  it('render_LastFiveDays_ShowsReminderOpensRenewAndNextPeriodForPaidPlans', async () => {
     seedSubscription(2, 27)
     renderPage()
     await screen.findByText('Đang dùng')
     expect(await screen.findByText(/còn 3 ngày nữa là hết hạn/)).toBeInTheDocument()
     expect(within(plan('Nâng cao')).getByRole('button', { name: 'Gia hạn gói' })).toHaveAttribute('href', '/owner/plans/2/checkout')
-    expect(within(plan('Gia đình')).getByRole('button', { name: 'Đăng ký kỳ sau (sắp có)' })).toBeDisabled()
-    expect(within(plan('Cơ bản')).getByRole('button', { name: 'Đăng ký kỳ sau (sắp có)' })).toBeDisabled()
-    expect(plan('Cơ bản')).toHaveTextContent('sau khi gói hiện tại kết thúc')
+    expect(within(plan('Gia đình')).getByRole('button', { name: 'Đăng ký kỳ sau' })).toHaveAttribute('href', '/owner/plans/3/checkout')
+    expect(within(plan('Cơ bản')).getByRole('button', { name: 'Đăng ký kỳ sau' })).toHaveAttribute('href', '/owner/plans/1/checkout')
     expect(within(plan('Miễn phí')).getByRole('button', { name: 'Dùng miễn phí' })).toBeDisabled()
   })
 
@@ -175,12 +175,21 @@ describe('OwnerPlansPage current subscription', () => {
     expect(within(plan('Cơ bản')).getByRole('button', { name: 'Chuyển gói' })).toBeDisabled()
   })
 
-  it('render_FirstThreeDays_HigherPlanShowsComingSoonAndLowerPlanIsLocked', async () => {
+  it('render_QueuedPlan_ShowsItsStartDateAndLocksEveryOtherPlan', async () => {
+    seedSubscription(2, 27, [{ subscriptionId: 2, userId: demoUserId(), planId: 1, status: 'Scheduled', startDate: new Date(Date.now() + 3 * DAY).toISOString(), endDate: new Date(Date.now() + 33 * DAY).toISOString() }])
+    renderPage()
+    await screen.findByText('Đang dùng')
+    // Một lần ở dải thông báo đầu trang, một lần làm lý do trên các thẻ gói bị khoá
+    expect((await screen.findAllByText(/Bạn đã đăng ký gói Cơ bản cho kỳ sau/)).length).toBeGreaterThanOrEqual(2)
+    expect(within(plan('Gia đình')).getByRole('button', { name: 'Đăng ký kỳ sau' })).toBeDisabled()
+    expect(within(plan('Nâng cao')).getByRole('button', { name: 'Gia hạn gói' })).toBeDisabled()
+  })
+
+  it('render_FirstThreeDays_HigherPlanOffersUpgradeAndLowerPlanIsLocked', async () => {
     seedSubscription(2, 1)
     renderPage()
     await screen.findByText('Đang dùng')
-    expect(within(plan('Gia đình')).getByRole('button', { name: 'Nâng cấp (sắp có)' })).toBeDisabled()
-    expect(plan('Gia đình')).toHaveTextContent('phần chênh lệch')
+    expect(within(plan('Gia đình')).getByRole('button', { name: 'Nâng cấp' })).toHaveAttribute('href', '/owner/plans/3/checkout')
     expect(within(plan('Cơ bản')).getByRole('button', { name: 'Chuyển gói' })).toBeDisabled()
     expect(plan('Cơ bản')).toHaveTextContent('chỉ chọn được khi gói hiện tại sắp hết hạn')
   })

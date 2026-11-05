@@ -63,6 +63,15 @@ describe('axiosClient', () => {
     expect(error.message).toBe('Email is already registered.')
   })
 
+  it('response_ErrorWithReasonCode_KeepsCodeFromEitherField', async () => {
+    const viaCode = await axiosClient.post('/x', {}, { adapter: errorAdapter(409, { status: 409, detail: 'a', code: 'PLAN_CHANGE_LOCKED' }) }).catch((e) => e)
+    const viaErrorCode = await axiosClient.post('/x', {}, { adapter: errorAdapter(403, { status: 403, detail: 'b', errorCode: 'SUBSCRIPTION_EXPIRED' }) }).catch((e) => e)
+    const none = await axiosClient.post('/x', {}, { adapter: errorAdapter(400, { status: 400, detail: 'c' }) }).catch((e) => e)
+    expect(viaCode.code).toBe('PLAN_CHANGE_LOCKED')
+    expect(viaErrorCode.code).toBe('SUBSCRIPTION_EXPIRED')
+    expect(none.code).toBeNull()
+  })
+
   it('response_NetworkError_ReturnsStatusZero', async () => {
     const adapter = vi.fn((config) => {
       const error = new Error('Network Error')

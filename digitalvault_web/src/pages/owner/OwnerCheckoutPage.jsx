@@ -1,8 +1,8 @@
 import { AlertTriangle, Building2, CalendarClock, CreditCard, HardDrive, Landmark, Lock, QrCode, ShieldCheck, Vault, Wallet } from 'lucide-react'
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Alert, Button, Form } from 'react-bootstrap'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { createVnpayCheckout, getMySubscription, getPlans, selectFreePlan } from '../../callapi/paymentApi'
+import { createVnpayCheckout, getMySubscription, getPlans, getQuote, selectFreePlan } from '../../callapi/paymentApi'
 import AdminResourceState from '../../components/admin/AdminResourceState'
 import { BackLink } from '../../components/beneficiary/BeneficiaryUi'
 import MockNotice from '../../components/common/MockNotice'
@@ -29,10 +29,11 @@ import { getPlanChange } from '../../utils/planChange'
 
 const METHOD_ICONS = { VNPay: Landmark, MoMo: Wallet, BankTransfer: Building2 }
 
-// Tải danh mục gói và gói hiện tại cùng lúc; lỗi khi lấy gói hiện tại không chặn việc thanh toán
-async function loadCheckout() {
-  const [plans, subscription] = await Promise.all([getPlans(), getMySubscription().catch(() => null)])
-  return { plans, subscription }
+// Tải danh mục gói, gói hiện tại và báo giá của BE cùng lúc; lỗi khi lấy gói hiện tại hoặc báo giá không chặn việc thanh toán
+// (không có báo giá thì dùng quy tắc tại chỗ; BE vẫn kiểm tra lại khi tạo giao dịch)
+async function loadCheckout(planId) {
+  const [plans, subscription, quote] = await Promise.all([getPlans(), getMySubscription().catch(() => null), getQuote(planId).catch(() => null)])
+  return { plans, subscription, quote }
 }
 
 function SummaryRow({ label, children, strong = false }) {
@@ -89,7 +90,8 @@ function MethodOption({ method, checked, onChange }) {
 export default function OwnerCheckoutPage({ mockMode = MOCK_MODE, qrPollMs = QR_POLL_MS }) {
   const { planId } = useParams()
   const navigate = useNavigate()
-  const { data, error, loading, reload } = useAdminResource(loadCheckout)
+  const fetchCheckout = useCallback(() => loadCheckout(planId), [planId])
+  const { data, error, loading, reload } = useAdminResource(fetchCheckout)
   const [method, setMethod] = useState('VNPay')
   const [agreed, setAgreed] = useState(false)
   // paying: null | 'redirect' | 'qr' (đang tạo giao dịch theo cách nào)
@@ -114,10 +116,17 @@ export default function OwnerCheckoutPage({ mockMode = MOCK_MODE, qrPollMs = QR_
   const free = isFreePlan(plan)
   const current = data.subscription?.hasActiveSubscription ? data.subscription.subscription : null
   // Gõ thẳng địa chỉ thanh toán cũng không vượt được quy tắc đổi gói (BE vẫn kiểm tra lại)
+  // Có báo giá của BE thì BE quyết định; lý do tại chỗ (có ngày giờ dễ đọc) được ưu tiên hiển thị. Không có báo giá thì dùng quy tắc tại chỗ.
+  const quote = data.quote
   const change = getPlanChange({ plan, subscription: current })
-  if (!change.allowed) {
-    return <Unavailable title="Chưa thể chọn gói này" message={change.reason ?? 'Gói này hiện không thể chọn. Hãy quay lại danh sách gói.'} />
+  const blocked = quote ? !quote.allowed : !change.allowed
+  if (blocked) {
+    const reason = (!change.allowed ? change.reason : null) ?? quote?.reasonMessage
+    return <Unavailable title="Chưa thể chọn gói này" message={reason ?? 'Gói này hiện không thể chọn. Hãy quay lại danh sách gói.'} />
   }
+  const changeType = quote?.changeType ?? { upgrade: 'Upgrade', renew: 'Renew', 'next-period': 'Scheduled' }[change.type] ?? null
+  const queued = changeType === 'Renew' || changeType === 'Scheduled'
+  const amountDue = quote ? quote.amountDue : Number(plan.price)
   const renewing = current?.plan?.planId === plan.planId
   const canPay = agreed && (free || method === 'VNPay') && paying === null
 
@@ -229,9 +238,15 @@ export default function OwnerCheckoutPage({ mockMode = MOCK_MODE, qrPollMs = QR_
             <Alert variant="warning" className="av-alert mb-0 d-flex gap-2">
               <AlertTriangle size={16} aria-hidden="true" className="flex-shrink-0 mt-1" />
               <span>
-                {renewing
-                  ? `Bạn đang dùng gói ${plan.planName} (hết hạn ${formatPaymentDate(current.endDate)}). Thanh toán lần này sẽ kích hoạt một kỳ mới thay cho kỳ hiện tại.`
-                  : `Bạn đang dùng gói ${current.plan?.planName ?? 'hiện tại'} (hết hạn ${formatPaymentDate(current.endDate)}). ${free ? 'Khi kích hoạt' : 'Khi thanh toán thành công'}, gói này sẽ hết hạn và gói ${plan.planName} có hiệu lực ngay.`}
+                {changeType === 'Upgrade'
+                  ? `Bạn đang dùng gói ${current.plan?.planName ?? 'hiện tại'} (hết hạn ${formatPaymentDate(current.endDate)}). Trong 3 ngày đầu bạn chỉ trả phần chênh lệch; khi thanh toán thành công, gói ${current.plan?.planName ?? 'hiện tại'} kết thúc ngay và gói ${plan.planName} chạy đủ ${formatDuration(plan.durationDays)} kể từ hôm nay. Phần chưa dùng của gói cũ không được hoàn tiền.`
+                  : renewing && queued
+                    ? `Bạn đang dùng gói ${plan.planName} (hết hạn ${formatPaymentDate(current.endDate)}). Gia hạn: kỳ mới sẽ bắt đầu sau khi kỳ hiện tại kết thúc, bạn không mất ngày đang còn.`
+                    : queued
+                      ? `Bạn đang dùng gói ${current.plan?.planName ?? 'hiện tại'} (hết hạn ${formatPaymentDate(current.endDate)}). Gói ${plan.planName} sẽ bắt đầu sau khi gói ${current.plan?.planName ?? 'hiện tại'} kết thúc; đến lúc đó bạn vẫn dùng gói hiện tại bình thường. Đã thanh toán là không hoàn tiền.`
+                      : renewing
+                        ? `Bạn đang dùng gói ${plan.planName} (hết hạn ${formatPaymentDate(current.endDate)}). Thanh toán lần này sẽ kích hoạt một kỳ mới thay cho kỳ hiện tại.`
+                        : `Bạn đang dùng gói ${current.plan?.planName ?? 'hiện tại'} (hết hạn ${formatPaymentDate(current.endDate)}). ${free ? 'Khi kích hoạt' : 'Khi thanh toán thành công'}, gói này sẽ hết hạn và gói ${plan.planName} có hiệu lực ngay.`}
               </span>
             </Alert>
           )}
@@ -245,11 +260,19 @@ export default function OwnerCheckoutPage({ mockMode = MOCK_MODE, qrPollMs = QR_
             <dl className="mb-0 d-flex flex-column gap-2 fs-13">
               <SummaryRow label="Gói dịch vụ">{plan.planName}</SummaryRow>
               <SummaryRow label="Thời hạn">{formatDuration(plan.durationDays)}</SummaryRow>
-              <SummaryRow label="Hiệu lực dự kiến">{`đến ${formatPaymentDate(estimatedEndDate(plan.durationDays))}`}</SummaryRow>
+              {queued ? (
+                <>
+                  <SummaryRow label="Bắt đầu">{formatPaymentDate(quote?.startsAt ?? current?.endDate)}</SummaryRow>
+                  <SummaryRow label="Hiệu lực đến">{formatPaymentDate(quote?.endsAt ?? estimatedEndDate(plan.durationDays, new Date(current?.endDate).getTime()))}</SummaryRow>
+                </>
+              ) : (
+                <SummaryRow label="Hiệu lực dự kiến">{`đến ${formatPaymentDate(quote?.endsAt ?? estimatedEndDate(plan.durationDays))}`}</SummaryRow>
+              )}
               <SummaryRow label="Đơn giá">{formatPlanPrice(plan)}</SummaryRow>
+              {changeType === 'Upgrade' && <SummaryRow label="Phần chênh lệch">{`${formatVnd(plan.price)} − ${formatVnd(current?.plan?.price ?? 0)}`}</SummaryRow>}
               <hr className="my-1" />
               <SummaryRow label="Tổng thanh toán" strong>
-                {formatVnd(plan.price)}
+                {formatVnd(amountDue)}
               </SummaryRow>
             </dl>
 
@@ -279,7 +302,7 @@ export default function OwnerCheckoutPage({ mockMode = MOCK_MODE, qrPollMs = QR_
                       : 'Kích hoạt gói miễn phí'
                     : paying === 'redirect'
                       ? 'Đang chuyển tới VNPay...'
-                      : `Thanh toán ${formatVnd(plan.price)}`}
+                      : `Thanh toán ${formatVnd(amountDue)}`}
                 </Button>
                 {!free && (
                   <Button type="button" variant="light" className="av-btn av-btn-md w-100 border" disabled={!canPay} onClick={() => startCheckout('qr')}>

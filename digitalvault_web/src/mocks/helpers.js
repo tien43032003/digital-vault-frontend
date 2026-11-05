@@ -2,8 +2,8 @@ import { delay, HttpResponse } from 'msw'
 import { getDb, getMockLatency, getSessionUserId, isMockHybrid } from './db'
 
 // Trả lỗi đúng định dạng của BE: { status, detail }
-export function problem(status, detail) {
-  return HttpResponse.json({ status, detail }, { status })
+export function problem(status, detail, code) {
+  return HttpResponse.json(code ? { status, detail, code, errorCode: code } : { status, detail }, { status })
 }
 
 // Giống middleware BE: body có trường ngoài hợp đồng thì trả 400

@@ -25,11 +25,67 @@ const subscriptions = () => {
   return db.userSubscriptions
 }
 
-// Như BE: thanh toán thành công thì gói đang hiệu lực hết hạn và gói mới có hiệu lực từ bây giờ
+const isLive = (item, userId, now) => item.userId === userId && item.status === 'Active' && new Date(item.endDate).getTime() > now
+
+const currentPaidOf = (userId, now) =>
+  subscriptions()
+    .filter((item) => isLive(item, userId, now))
+    .map((item) => ({ item, plan: PLANS.find((plan) => plan.planId === item.planId) }))
+    .filter(({ plan }) => plan && plan.price > 0)
+    .sort((a, b) => b.item.subscriptionId - a.item.subscriptionId)[0] ?? null
+
+const scheduledOf = (userId) => subscriptions().filter((item) => item.userId === userId && item.status === 'Scheduled').sort((a, b) => b.subscriptionId - a.subscriptionId)[0] ?? null
+
+const rejected = (reasonCode, reasonMessage) => ({ allowed: false, reasonCode, reasonMessage, changeType: null, amountDue: 0, startsAt: null, endsAt: null })
+
+// Như BE (VnPayService.GetQuote): 3 ngày đầu chỉ nâng cấp trả phần chênh lệch; giữa kỳ khoá; 5 ngày cuối đăng ký kỳ sau; hết hạn hoặc chưa có gói trả phí thì mua mới
+function computeQuote(userId, plan, now = Date.now()) {
+  const current = currentPaidOf(userId, now)
+  const scheduled = scheduledOf(userId)
+  const duration = plan.durationDays > 0 ? plan.durationDays : 30
+  if (current) {
+    const start = new Date(current.item.startDate).getTime()
+    const end = new Date(current.item.endDate).getTime()
+    if (now <= start + 3 * DAY_MS) {
+      if (plan.price > current.plan.price) {
+        return { allowed: true, reasonCode: null, reasonMessage: null, changeType: 'Upgrade', amountDue: plan.price - current.plan.price, startsAt: new Date(now).toISOString(), endsAt: new Date(now + duration * DAY_MS).toISOString() }
+      }
+      return rejected('UPGRADE_PRICE_TOO_LOW', 'Trong 3 ngày đầu chỉ được nâng cấp lên gói có giá cao hơn gói hiện tại.')
+    }
+    if (now < end - 5 * DAY_MS) return rejected('PLAN_CHANGE_LOCKED', `Chỉ đổi gói được từ ${new Date(end - 5 * DAY_MS).toISOString()}.`)
+    if (scheduled) return rejected('SCHEDULED_PLAN_EXISTS', 'Bạn đã có một gói đăng ký chờ kích hoạt. Chỉ cho phép tối đa một gói chờ.')
+    return {
+      allowed: true,
+      reasonCode: null,
+      reasonMessage: null,
+      changeType: plan.planId === current.plan.planId ? 'Renew' : 'Scheduled',
+      amountDue: plan.price,
+      startsAt: current.item.endDate,
+      endsAt: new Date(end + duration * DAY_MS).toISOString(),
+    }
+  }
+  if (scheduled) return rejected('SCHEDULED_PLAN_EXISTS', 'Bạn đã có một gói đăng ký chờ kích hoạt. Chỉ cho phép tối đa một gói chờ.')
+  return { allowed: true, reasonCode: null, reasonMessage: null, changeType: 'New', amountDue: plan.price, startsAt: new Date(now).toISOString(), endsAt: new Date(now + duration * DAY_MS).toISOString() }
+}
+
+const toSubscriptionDto = (item) => {
+  if (!item) return null
+  const { subscriptionId, status, startDate, endDate, planId } = item
+  return { subscriptionId, status, startDate, endDate, plan: PLANS.find((plan) => plan.planId === planId) ?? null }
+}
+
+// Như BE: thanh toán thành công thì gói đang hiệu lực hết hạn và gói mới có hiệu lực từ bây giờ; riêng gia hạn/đăng ký kỳ sau thì xếp hàng chờ, bắt đầu khi gói hiện tại kết thúc
 function activateSubscription(payment) {
   const plan = PLANS.find((item) => item.planId === payment.planId)
   if (!plan) return
   const now = Date.now()
+  if ((payment.changeType === 'Renew' || payment.changeType === 'Scheduled') && payment.startsAt) {
+    const queuedId = subscriptions().reduce((max, item) => Math.max(max, item.subscriptionId), 0) + 1
+    const queued = { subscriptionId: queuedId, userId: payment.userId, planId: plan.planId, status: 'Scheduled', startDate: payment.startsAt, endDate: payment.endsAt }
+    subscriptions().push(queued)
+    payment.subscriptionId = queuedId
+    return queued
+  }
   subscriptions()
     .filter((item) => item.userId === payment.userId && item.status === 'Active')
     .forEach((item) => {
@@ -84,10 +140,34 @@ export const paymentHandlers = [
       const active = subscriptions()
         .filter((item) => item.userId === userId && item.status === 'Active' && new Date(item.endDate).getTime() > now)
         .sort((a, b) => b.subscriptionId - a.subscriptionId)[0]
-      if (!active) return HttpResponse.json({ hasActiveSubscription: false, subscription: null })
-      const { subscriptionId, status, startDate, endDate, planId } = active
-      const plan = PLANS.find((item) => item.planId === planId) ?? null
-      return HttpResponse.json({ hasActiveSubscription: true, subscription: { subscriptionId, status, startDate, endDate, plan } })
+      const scheduledSubscription = toSubscriptionDto(scheduledOf(userId))
+      if (!active) {
+        // Chỉ xem khi từng có gói trả phí, nay đã hết hạn và chưa có gì thay thế
+        const hadPaid = subscriptions().some((item) => item.userId === userId && (PLANS.find((plan) => plan.planId === item.planId)?.price ?? 0) > 0)
+        return HttpResponse.json({ hasActiveSubscription: false, subscription: null, scheduledSubscription, upgradeWindowEndsAt: null, renewalWindowStartsAt: null, daysLeft: null, isReadOnly: hadPaid && !scheduledSubscription })
+      }
+      const subscription = toSubscriptionDto(active)
+      const paid = (subscription.plan?.price ?? 0) > 0
+      return HttpResponse.json({
+        hasActiveSubscription: true,
+        subscription,
+        scheduledSubscription,
+        upgradeWindowEndsAt: paid ? new Date(new Date(active.startDate).getTime() + 3 * DAY_MS).toISOString() : null,
+        renewalWindowStartsAt: paid ? new Date(new Date(active.endDate).getTime() - 5 * DAY_MS).toISOString() : null,
+        daysLeft: paid ? Math.max(0, Math.ceil((new Date(active.endDate).getTime() - now) / DAY_MS)) : null,
+        isReadOnly: false,
+      })
+    }),
+  ),
+
+  // Báo giá khi đổi sang một gói (SubscriptionQuoteDto): được chọn hay không, số tiền phải trả và ngày hiệu lực
+  http.get(
+    '*/api/payments/quote',
+    route(({ request, userId }) => {
+      const planId = Number(new URL(request.url).searchParams.get('planId'))
+      const plan = PLANS.find((item) => item.planId === planId)
+      if (!plan) return problem(404, 'Subscription plan not found.')
+      return HttpResponse.json(computeQuote(userId, plan))
     }),
   ),
 
@@ -169,15 +249,20 @@ export const paymentHandlers = [
       if (hasUnknownFields(body, ['planId']) || !Number.isInteger(body?.planId)) return problem(400, 'PlanId is required.')
       const plan = PLANS.find((item) => item.planId === body.planId)
       if (!plan) return problem(404, 'Subscription plan not found or inactive.')
+      const quote = computeQuote(userId, plan)
+      if (!quote.allowed) return problem(409, quote.reasonMessage, quote.reasonCode)
       const existing = takeExistingPending(userId)
-      const free = !(plan.price > 0)
+      const free = !(quote.amountDue > 0)
       const transactionCode = existing && existing.planId === plan.planId && !free ? existing.transactionCode : newTransactionCode()
       const payment = existing
         ? Object.assign(existing, {
             transactionCode,
             planId: plan.planId,
             planName: plan.planName,
-            amount: plan.price,
+            amount: quote.amountDue,
+            changeType: quote.changeType,
+            startsAt: quote.startsAt,
+            endsAt: quote.endsAt,
             paymentMethod: free ? 'Free' : 'VNPay',
             status: free ? 'Success' : 'Pending',
             createdAt: new Date().toISOString(),
@@ -188,7 +273,10 @@ export const paymentHandlers = [
             userId,
             planId: plan.planId,
             planName: plan.planName,
-            amount: plan.price,
+            amount: quote.amountDue,
+            changeType: quote.changeType,
+            startsAt: quote.startsAt,
+            endsAt: quote.endsAt,
             paymentMethod: free ? 'Free' : 'VNPay',
             status: free ? 'Success' : 'Pending',
             createdAt: new Date().toISOString(),
@@ -201,8 +289,8 @@ export const paymentHandlers = [
         return HttpResponse.json({ transactionCode, amount: 0, paymentUrl: '' })
       }
       saveDb()
-      const query = new URLSearchParams({ vnp_TxnRef: transactionCode, vnp_Amount: String(plan.price * 100), vnp_OrderInfo: `Payment for ${plan.planName}` })
-      return HttpResponse.json({ transactionCode, amount: plan.price, paymentUrl: `/payment/mock-vnpay?${query}` })
+      const query = new URLSearchParams({ vnp_TxnRef: transactionCode, vnp_Amount: String(quote.amountDue * 100), vnp_OrderInfo: `Payment for ${plan.planName}` })
+      return HttpResponse.json({ transactionCode, amount: quote.amountDue, paymentUrl: `/payment/mock-vnpay?${query}` })
     }),
   ),
 

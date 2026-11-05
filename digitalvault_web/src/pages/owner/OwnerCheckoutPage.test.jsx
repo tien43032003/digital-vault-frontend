@@ -89,7 +89,51 @@ describe('OwnerCheckoutPage summary', () => {
     ]
     renderCheckout()
     expect(await screen.findByRole('alert')).toHaveTextContent('Bạn đang dùng gói Nâng cao')
-    expect(screen.getByRole('alert')).toHaveTextContent('kích hoạt một kỳ mới')
+    expect(screen.getByRole('alert')).toHaveTextContent('kỳ mới sẽ bắt đầu sau khi kỳ hiện tại kết thúc')
+  })
+
+  const seedSubscription = (planId, elapsedDays, extra = []) => {
+    getDb().userSubscriptions = [
+      { subscriptionId: 1, userId: demoUserId(), planId, status: 'Active', startDate: new Date(Date.now() - elapsedDays * DAY).toISOString(), endDate: new Date(Date.now() + (30 - elapsedDays) * DAY).toISOString() },
+      ...extra,
+    ]
+  }
+
+  it('render_UpgradeInFirstThreeDays_ShowsDifferenceAsTotalAndExplainsOldPlanEnds', async () => {
+    seedSubscription(1, 1)
+    renderCheckout(2)
+    await waitForCheckout()
+    const summary = screen.getByRole('heading', { name: 'Tóm tắt đơn hàng' }).closest('section')
+    expect(summary).toHaveTextContent('Phần chênh lệch')
+    expect(summary).toHaveTextContent('Tổng thanh toán400.000 ₫')
+    expect(screen.getByRole('button', { name: /Thanh toán 400\.000/ })).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('chỉ trả phần chênh lệch')
+    expect(screen.getByRole('alert')).toHaveTextContent('gói Cơ bản kết thúc ngay')
+  })
+
+  it('render_NextPeriodInLastDays_ShowsFullPriceAndStartAfterCurrentPlanEnds', async () => {
+    seedSubscription(1, 27)
+    renderCheckout(3)
+    await waitForCheckout()
+    const summary = screen.getByRole('heading', { name: 'Tóm tắt đơn hàng' }).closest('section')
+    expect(summary).toHaveTextContent('Tổng thanh toán899.000 ₫')
+    expect(summary).toHaveTextContent('Bắt đầu')
+    expect(screen.getByRole('alert')).toHaveTextContent('bắt đầu sau khi gói Cơ bản kết thúc')
+    expect(screen.getByRole('alert')).toHaveTextContent('không hoàn tiền')
+  })
+
+  it('render_QueuedPlanAlreadyExists_BlocksCheckoutWithServerReason', async () => {
+    seedSubscription(1, 27, [{ subscriptionId: 2, userId: demoUserId(), planId: 2, status: 'Scheduled', startDate: new Date(Date.now() + 3 * DAY).toISOString(), endDate: new Date(Date.now() + 33 * DAY).toISOString() }])
+    renderCheckout(3)
+    expect(await screen.findByRole('heading', { name: 'Chưa thể chọn gói này' })).toBeInTheDocument()
+    expect(screen.getByText(/đã có một gói đăng ký chờ kích hoạt/)).toBeInTheDocument()
+  })
+
+  it('render_QuoteFails_FallsBackToLocalRulesInsteadOfBlockingPayment', async () => {
+    server.use(http.get('*/api/payments/quote', () => HttpResponse.json({ status: 500, detail: 'x' }, { status: 500 })))
+    renderCheckout()
+    await waitForCheckout()
+    expect(screen.getByRole('button', { name: /Thanh toán 499\.000/ })).toBeInTheDocument()
   })
 
   it('render_PlanLockedByChangeRules_ShowsReasonInsteadOfPayment', async () => {

@@ -6,10 +6,12 @@ const SAFE_METHODS = ['get', 'head', 'options']
 
 // Lỗi API đã được chuẩn hoá từ response { status, detail } của BE
 export class ApiError extends Error {
-  constructor(status, message) {
+  constructor(status, message, code = null) {
     super(message)
     this.name = 'ApiError'
     this.status = status
+    // Mã lý do do BE gửi kèm (vd PLAN_CHANGE_LOCKED, SUBSCRIPTION_EXPIRED); null khi BE không gửi
+    this.code = code
   }
 }
 
@@ -90,7 +92,8 @@ axiosClient.interceptors.response.use(
       if (!error.config?.skipAuthRedirect || error.config?.refreshAttempted) clearTokens()
       if (!error.config?.skipAuthRedirect && unauthorizedHandler) unauthorizedHandler()
     }
-    return Promise.reject(new ApiError(status, message))
+    const code = error.response?.data?.code ?? error.response?.data?.errorCode ?? null
+    return Promise.reject(new ApiError(status, message, code))
   },
 )
 
