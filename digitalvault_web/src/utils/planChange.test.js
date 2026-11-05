@@ -17,6 +17,7 @@ const premiumStartedDaysAgo = (daysAgo) => ({
   endDate: new Date(NOW - daysAgo * DAY + 30 * DAY).toISOString(),
 })
 
+const NOT_SUPPORTED = { upgradeDifference: false, scheduledNextPeriod: false }
 const change = (plan, subscription, extra = {}) => getPlanChange({ plan, subscription, now: NOW, ...extra })
 
 describe('getPlanChange without a paid plan', () => {
@@ -58,13 +59,13 @@ describe('getPlanChange during the first 3 days of a paid plan', () => {
   })
 
   it('higherPricePlan_WhenBackendHasNoDifferencePricingYet_IsShownAsComingSoon', () => {
-    const result = change(VIP, sub)
+    const result = change(VIP, sub, { support: NOT_SUPPORTED })
     expect(result).toMatchObject({ type: 'upgrade-pending', allowed: false, label: 'Nâng cấp (sắp có)' })
     expect(result.reason).toContain('phần chênh lệch')
   })
 
-  it('higherPricePlan_WhenBackendSupportsDifferencePricing_IsAllowedAsUpgrade', () => {
-    expect(change(VIP, sub, { support: { upgradeDifference: true, scheduledNextPeriod: false } })).toMatchObject({ type: 'upgrade', allowed: true, label: 'Nâng cấp', primary: true })
+  it('higherPricePlan_ByDefaultBackendSupportsDifferencePricing_IsAllowedAsUpgrade', () => {
+    expect(change(VIP, sub)).toMatchObject({ type: 'upgrade', allowed: true, label: 'Nâng cấp', primary: true })
   })
 
   it('samePlan_RenewIsLockedWithOpeningDate', () => {
@@ -79,7 +80,7 @@ describe('getPlanChange during the first 3 days of a paid plan', () => {
 
   it('upgradeWindowEdge_ExactlyThreeDaysIsStillInsideButJustAfterIsNot', () => {
     const exact = { ...premiumStartedDaysAgo(3) }
-    expect(change(VIP, exact).type).toBe('upgrade-pending')
+    expect(change(VIP, exact).type).toBe('upgrade')
     const after = { ...premiumStartedDaysAgo(3), startDate: new Date(NOW - 3 * DAY - 1000).toISOString() }
     expect(change(VIP, after).type).toBe('locked-mid')
   })
@@ -113,7 +114,15 @@ describe('getPlanChange in the last 5 days (renewal window)', () => {
     expect(change(PREMIUM, sub)).toMatchObject({ type: 'renew', allowed: true, label: 'Gia hạn gói', primary: true })
   })
 
-  it('anyOtherPaidPlanIncludingLowerOnes_IsAllowedForNextPeriod', () => {
+  it('anyOtherPaidPlanIncludingLowerOnes_WhenBackendCannotQueueYet_IsShownAsComingSoon', () => {
+    for (const plan of [STANDARD, VIP]) {
+      const result = change(plan, sub, { support: NOT_SUPPORTED })
+      expect(result).toMatchObject({ type: 'next-period-pending', allowed: false, label: 'Đăng ký kỳ sau (sắp có)', primary: false })
+      expect(result.reason).toContain('sau khi gói hiện tại kết thúc')
+    }
+  })
+
+  it('anyOtherPaidPlanIncludingLowerOnes_ByDefaultBackendCanQueue_IsAllowedForNextPeriod', () => {
     for (const plan of [STANDARD, VIP]) {
       expect(change(plan, sub)).toMatchObject({ type: 'next-period', allowed: true, label: 'Đăng ký kỳ sau', primary: false })
     }

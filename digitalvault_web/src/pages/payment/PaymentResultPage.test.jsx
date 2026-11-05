@@ -187,6 +187,34 @@ describe('PaymentResultPage pending polling', () => {
   })
 })
 
+describe('PaymentResultPage raw VNPay query fallback', () => {
+  // BE có thể chuyển hướng kèm nguyên các tham số vnp_* thay vì status và code
+  it('render_RawVnpayQueryWithoutStatus_UsesTxnRefAsCodeAndVerifiesWithServer', async () => {
+    await asLoggedInUser()
+    seedTransaction('Failed')
+    renderPage(`?vnp_TxnRef=${CODE}&vnp_ResponseCode=00&vnp_TransactionStatus=00&vnp_Amount=49900000`)
+    expect(await heading('Thanh toán thất bại')).toBeInTheDocument()
+    expect(screen.getByText(CODE)).toBeInTheDocument()
+  })
+
+  it('render_RawVnpayQueryNotSignedIn_ShowsResponseCodeResultAsUnverified', async () => {
+    renderPage(`?vnp_TxnRef=${CODE}&vnp_ResponseCode=24`)
+    expect(await heading('Thanh toán thất bại')).toBeInTheDocument()
+    expect(screen.getByText(/chưa được đối chiếu/)).toBeInTheDocument()
+  })
+
+  it('render_RawVnpayQueryWithBadTxnRef_ShowsMissingInfo', async () => {
+    renderPage('?vnp_TxnRef=%3Cscript%3E&vnp_ResponseCode=00')
+    expect(await heading('Không có thông tin thanh toán')).toBeInTheDocument()
+  })
+
+  it('render_StatusAndCodePresent_TakePriorityOverRawQuery', async () => {
+    renderPage(`?status=Failed&code=${CODE}&vnp_TxnRef=aaaaaaaaaaaa&vnp_ResponseCode=00`)
+    expect(await heading('Thanh toán thất bại')).toBeInTheDocument()
+    expect(screen.getByText(CODE)).toBeInTheDocument()
+  })
+})
+
 describe('PaymentResultPage links', () => {
   it('links_AfterResult_GoToPlansOrHome', async () => {
     renderPage(`?status=Failed&code=${CODE}`)

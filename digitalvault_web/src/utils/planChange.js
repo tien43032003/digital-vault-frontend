@@ -8,9 +8,8 @@ export const UPGRADE_WINDOW_DAYS = 3
 // 5 ngày cuối của gói: nhắc gia hạn và được đăng ký gói cho kỳ sau
 export const RENEWAL_WINDOW_DAYS = 5
 
-// Những việc BE đã hỗ trợ. Hiện BE chưa tính tiền chênh lệch khi nâng cấp và chưa có gói xếp hàng cho kỳ sau;
-// khi BE làm xong thì bật cờ tương ứng, FE tự mở nút.
-export const BACKEND_SUPPORTS = { upgradeDifference: false, scheduledNextPeriod: false }
+// Những việc BE đã hỗ trợ (tính tiền chênh lệch khi nâng cấp, xếp gói cho kỳ sau). Tắt cờ nào thì nút tương ứng hiện "sắp có" và bị khoá.
+export const BACKEND_SUPPORTS = { upgradeDifference: true, scheduledNextPeriod: true }
 
 const time = (value) => parseServerDate(value).getTime()
 
@@ -57,10 +56,11 @@ export function getPlanChange({ plan, subscription, scheduled = null, now = Date
   const inRenewalWindow = time(active.endDate) - now <= RENEWAL_WINDOW_DAYS * DAY_MS
   if (inRenewalWindow) {
     if (scheduled?.plan) {
-      return result('scheduled', false, label, false, `Bạn đã đăng ký gói ${scheduled.plan.planName} cho kỳ sau, bắt đầu ngày ${formatPaymentDate(scheduled.startDate)}.`)
+      return result('scheduled', false, same ? 'Gia hạn gói' : 'Đăng ký kỳ sau', false, `Bạn đã đăng ký gói ${scheduled.plan.planName} cho kỳ sau, bắt đầu ngày ${formatPaymentDate(scheduled.startDate)}.`)
     }
     if (same) return result('renew', true, 'Gia hạn gói', true)
-    return result('next-period', true, 'Đăng ký kỳ sau', false)
+    if (support.scheduledNextPeriod) return result('next-period', true, 'Đăng ký kỳ sau', false)
+    return result('next-period-pending', false, 'Đăng ký kỳ sau (sắp có)', false, 'Gói mới sẽ bắt đầu tính sau khi gói hiện tại kết thúc. Tính năng này sắp được mở.')
   }
 
   const sinceStart = now - time(active.startDate)

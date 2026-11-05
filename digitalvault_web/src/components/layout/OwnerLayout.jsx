@@ -1,6 +1,8 @@
 import { Activity, Bell, ClipboardList, CreditCard, FolderLock, History, LogOut, Settings, ShieldCheck, UserCog, Users } from 'lucide-react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { Alert } from 'react-bootstrap'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
+import { useReadOnlyStatus } from '../../hooks/useReadOnlyStatus'
 import { useUnreadNotifications } from '../../hooks/useUnreadNotifications'
 import { formatUnreadCount } from '../../utils/notifications'
 import BrandLogo from '../common/BrandLogo'
@@ -77,6 +79,9 @@ function SidebarSection({ title, items }) {
 export default function OwnerLayout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const readOnly = useReadOnlyStatus()
+  // Trang Gói dịch vụ và Thanh toán tự giải thích tình trạng gói nên không lặp lại dải thông báo
+  const onPlansPage = useLocation().pathname.startsWith('/owner/plans')
 
   const handleLogout = async () => {
     await logout()
@@ -128,6 +133,12 @@ export default function OwnerLayout() {
       </aside>
 
       <main className="flex-grow-1 p-4" style={{ minWidth: 0 }}>
+        {readOnly && !onPlansPage && (
+          <Alert variant="warning" className="av-alert mb-4 d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <span>Gói dịch vụ của bạn đã hết hạn nên tài khoản đang ở chế độ chỉ xem. Bạn vẫn xem được dữ liệu và điểm danh sự sống; hãy gia hạn để tiếp tục thao tác.</span>
+            <Link to="/owner/plans">Xem các gói dịch vụ</Link>
+          </Alert>
+        )}
         <Outlet />
       </main>
     </div>

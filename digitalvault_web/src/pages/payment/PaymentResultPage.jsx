@@ -58,8 +58,12 @@ export default function PaymentResultPage({ pollIntervalMs = 3000, maxPolls = 10
   const { user } = useAuth()
   const workspace = user ? getDefaultRouteForRoles(user.roles, getPortalPreference()) : null
   const [searchParams] = useSearchParams()
-  const queryStatus = searchParams.get('status')
-  const code = searchParams.get('code')
+  // Ưu tiên status và code của BE; nếu BE chuyển hướng kèm nguyên tham số vnp_* thì lấy mã giao dịch từ vnp_TxnRef và suy ra kết quả tạm từ vnp_ResponseCode (vẫn chỉ là thông tin chưa đối chiếu)
+  const rawRef = searchParams.get('vnp_TxnRef')
+  const hasBackendResult = searchParams.get('status') !== null || searchParams.get('code') !== null
+  const code = hasBackendResult ? searchParams.get('code') : rawRef
+  const rawResponse = searchParams.get('vnp_ResponseCode')
+  const queryStatus = hasBackendResult ? searchParams.get('status') : rawRef && rawResponse ? (rawResponse === '00' ? 'Success' : 'Failed') : rawRef ? 'Pending' : null
   const valid = Object.hasOwn(OUTCOME, queryStatus ?? '') && VALID_CODE.test(code ?? '')
   const canVerify = valid && Boolean(getTokens())
 

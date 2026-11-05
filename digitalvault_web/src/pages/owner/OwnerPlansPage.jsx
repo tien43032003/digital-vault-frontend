@@ -9,14 +9,14 @@ import CurrentSubscriptionPanel from '../../components/payment/CurrentSubscripti
 import PaymentHistoryPanel from '../../components/payment/PaymentHistoryPanel'
 import { useAdminResource } from '../../hooks/useAdminResource'
 import { MOCK_MODE } from '../../mocks/mode'
-import { formatDuration, formatPlanPrice, formatStorage } from '../../utils/payment'
+import { formatDuration, formatPaymentDate, formatPlanPrice, formatStorage } from '../../utils/payment'
 import { getPlanChange, renewalReminder } from '../../utils/planChange'
 
 // Thẻ một gói: giá, thời hạn, giới hạn và nút Mua / Nâng cấp / Gia hạn sang màn hình thanh toán
-function PlanCard({ plan, subscription, now }) {
+function PlanCard({ plan, subscription, scheduled, now }) {
   const currentPlan = subscription?.plan ?? null
   const isCurrent = Boolean(currentPlan) && currentPlan.planId === plan.planId
-  const change = getPlanChange({ plan, subscription, now })
+  const change = getPlanChange({ plan, subscription, scheduled, now })
   return (
     <article
       className="av-panel d-flex flex-column gap-3 h-100"
@@ -85,6 +85,7 @@ export default function OwnerPlansPage({ mockMode = MOCK_MODE }) {
   const activeSubscription = subscription.data?.hasActiveSubscription ? (subscription.data.subscription ?? null) : null
   // Mốc giờ cố định theo lần mở trang (bấm Làm mới thì cập nhật), tránh gọi hàm không thuần khi render
   const [now, setNow] = useState(() => Date.now())
+  const scheduledSubscription = subscription.data?.scheduledSubscription ?? null
   const reminder = renewalReminder(activeSubscription, now)
 
   // Xoá state khỏi lịch sử để F5 không hiện lại thông báo cũ
@@ -126,7 +127,13 @@ export default function OwnerPlansPage({ mockMode = MOCK_MODE }) {
         </Alert>
       )}
 
-      {reminder.show && (
+      {scheduledSubscription?.plan && (
+        <Alert variant="info" className="av-alert mb-0" role="status">
+          {`Bạn đã đăng ký gói ${scheduledSubscription.plan.planName} cho kỳ sau, bắt đầu ngày ${formatPaymentDate(scheduledSubscription.startDate)}. Gói hiện tại vẫn dùng bình thường đến hết hạn.`}
+        </Alert>
+      )}
+
+      {reminder.show && !scheduledSubscription && (
         <Alert variant="warning" className="av-alert mb-0" role="status">
           {`Gói ${activeSubscription.plan.planName} của bạn còn ${reminder.daysLeft} ngày nữa là hết hạn. Hãy gia hạn hoặc chọn gói cho kỳ sau; gói mới sẽ bắt đầu tính sau khi gói hiện tại kết thúc.`}
         </Alert>
@@ -142,7 +149,7 @@ export default function OwnerPlansPage({ mockMode = MOCK_MODE }) {
         <div className="row g-3">
           {plans.map((plan) => (
             <div key={plan.planId} className="col-12 col-md-6 col-xl-4">
-              <PlanCard plan={plan} subscription={activeSubscription} now={now} />
+              <PlanCard plan={plan} subscription={activeSubscription} scheduled={scheduledSubscription} now={now} />
             </div>
           ))}
         </div>

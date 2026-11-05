@@ -44,3 +44,10 @@ export async function confirmVnpayReturn(params) {
   const { data } = await axiosClient.get('/payments/vnpay/return', { params })
   return data
 }
+
+// Báo giá khi đổi sang gói planId: SubscriptionQuoteDto { allowed, reasonCode, reasonMessage, changeType, amountDue, startsAt, endsAt }
+// changeType: New | Renew | Upgrade | Scheduled; reasonCode: UPGRADE_PRICE_TOO_LOW | PLAN_CHANGE_LOCKED | SCHEDULED_PLAN_EXISTS
+export async function getQuote(planId) {
+  const { data } = await axiosClient.get('/payments/quote', { params: { planId } })
+  return data
+}

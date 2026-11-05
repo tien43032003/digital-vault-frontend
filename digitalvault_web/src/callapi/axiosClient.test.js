@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { clearTokens, getTokens, setTokens } from '../utils/tokenStorage'
-import axiosClient, { ApiError, setUnauthorizedHandler } from './axiosClient'
+import axiosClient, { ApiError, setUnauthorizedHandler, SUBSCRIPTION_EXPIRED_EVENT } from './axiosClient'
 
 // Adapter giả: trả về response hoặc lỗi theo status mong muốn
 const okAdapter = (data = {}) => vi.fn((config) => Promise.resolve({ data, status: 200, statusText: 'OK', headers: {}, config }))
@@ -61,6 +61,33 @@ describe('axiosClient', () => {
     expect(error).toBeInstanceOf(ApiError)
     expect(error.status).toBe(409)
     expect(error.message).toBe('Email is already registered.')
+  })
+
+  it('response_ErrorWithReasonCode_KeepsCodeFromEitherField', async () => {
+    const viaCode = await axiosClient.post('/x', {}, { adapter: errorAdapter(409, { status: 409, detail: 'a', code: 'PLAN_CHANGE_LOCKED' }) }).catch((e) => e)
+    const viaErrorCode = await axiosClient.post('/x', {}, { adapter: errorAdapter(403, { status: 403, detail: 'b', errorCode: 'SUBSCRIPTION_EXPIRED' }) }).catch((e) => e)
+    const none = await axiosClient.post('/x', {}, { adapter: errorAdapter(400, { status: 400, detail: 'c' }) }).catch((e) => e)
+    expect(viaCode.code).toBe('PLAN_CHANGE_LOCKED')
+    expect(viaErrorCode.code).toBe('SUBSCRIPTION_EXPIRED')
+    expect(none.code).toBeNull()
+  })
+
+  it('response_SubscriptionExpired403_AnnouncesReadOnlyModeAndKeepsFriendlyMessage', async () => {
+    const listener = vi.fn()
+    window.addEventListener(SUBSCRIPTION_EXPIRED_EVENT, listener)
+    const error = await axiosClient.post('/owner/vaults', {}, { adapter: errorAdapter(403, { status: 403, detail: 'Gói dịch vụ đã hết hạn.', code: 'SUBSCRIPTION_EXPIRED' }) }).catch((e) => e)
+    window.removeEventListener(SUBSCRIPTION_EXPIRED_EVENT, listener)
+    expect(listener).toHaveBeenCalledTimes(1)
+    expect(error.code).toBe('SUBSCRIPTION_EXPIRED')
+    expect(error.message).toContain('hết hạn')
+  })
+
+  it('response_Other403_DoesNotAnnounceReadOnlyMode', async () => {
+    const listener = vi.fn()
+    window.addEventListener(SUBSCRIPTION_EXPIRED_EVENT, listener)
+    await axiosClient.post('/owner/vaults', {}, { adapter: errorAdapter(403, { status: 403, detail: 'Forbidden' }) }).catch((e) => e)
+    window.removeEventListener(SUBSCRIPTION_EXPIRED_EVENT, listener)
+    expect(listener).not.toHaveBeenCalled()
   })
 
   it('response_NetworkError_ReturnsStatusZero', async () => {
