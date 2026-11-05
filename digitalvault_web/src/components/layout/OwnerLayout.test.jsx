@@ -2,11 +2,13 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
+import { useReadOnlyStatus } from '../../hooks/useReadOnlyStatus'
 import { useUnreadNotifications } from '../../hooks/useUnreadNotifications'
 import OwnerLayout from './OwnerLayout'
 
 vi.mock('../../hooks/useAuth', () => ({ useAuth: vi.fn() }))
 vi.mock('../../hooks/useUnreadNotifications', () => ({ useUnreadNotifications: vi.fn() }))
+vi.mock('../../hooks/useReadOnlyStatus', () => ({ useReadOnlyStatus: vi.fn(() => false) }))
 
 const logout = vi.fn()
 
@@ -94,6 +96,46 @@ describe('OwnerLayout', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Đăng xuất' }))
     expect(logout).toHaveBeenCalledTimes(1)
     expect(await screen.findByText('landing-page')).toBeInTheDocument()
+  })
+})
+
+describe('OwnerLayout read-only banner', () => {
+  const renderAt = (path) => {
+    useAuth.mockReturnValue({ user: { userId: 1, roles: ['Owner'], email: 'an.nguyen@example.com' }, logout })
+    return render(
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path="/owner" element={<OwnerLayout />}>
+            <Route path="assets" element={<p>assets-content</p>} />
+            <Route path="plans" element={<p>plans-content</p>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    )
+  }
+
+  beforeEach(() => {
+    useUnreadNotifications.mockReset().mockReturnValue(0)
+  })
+
+  it('banner_ReadOnly_ShowsExplanationWithLinkToPlans', () => {
+    useReadOnlyStatus.mockReturnValue(true)
+    renderAt('/owner/assets')
+    expect(screen.getByRole('alert')).toHaveTextContent('chỉ xem')
+    expect(screen.getByRole('link', { name: 'Xem các gói dịch vụ' })).toHaveAttribute('href', '/owner/plans')
+    expect(screen.getByText('assets-content')).toBeInTheDocument()
+  })
+
+  it('banner_ReadOnlyOnPlansPage_IsHiddenBecauseThePageExplainsItself', () => {
+    useReadOnlyStatus.mockReturnValue(true)
+    renderAt('/owner/plans')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('banner_NotReadOnly_IsHidden', () => {
+    useReadOnlyStatus.mockReturnValue(false)
+    renderAt('/owner/assets')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 })
 

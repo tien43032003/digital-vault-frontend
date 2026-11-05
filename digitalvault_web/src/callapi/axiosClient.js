@@ -4,6 +4,10 @@ import { clearTokens, getTokens, setTokens } from '../utils/tokenStorage'
 // Các method không làm thay đổi dữ liệu thì BE không yêu cầu header chống CSRF
 const SAFE_METHODS = ['get', 'head', 'options']
 
+// Phát ra khi BE từ chối thao tác ghi vì gói đã hết hạn (403 SUBSCRIPTION_EXPIRED) để giao diện chuyển sang chế độ chỉ xem ngay
+export const SUBSCRIPTION_EXPIRED_EVENT = 'aeterna:subscription-expired'
+const EXPIRED_MESSAGE = 'Gói dịch vụ đã hết hạn nên tài khoản đang ở chế độ chỉ xem. Hãy gia hạn gói để tiếp tục thao tác.'
+
 // Lỗi API đã được chuẩn hoá từ response { status, detail } của BE
 export class ApiError extends Error {
   constructor(status, message, code = null) {
@@ -93,6 +97,10 @@ axiosClient.interceptors.response.use(
       if (!error.config?.skipAuthRedirect && unauthorizedHandler) unauthorizedHandler()
     }
     const code = error.response?.data?.code ?? error.response?.data?.errorCode ?? null
+    if (status === 403 && code === 'SUBSCRIPTION_EXPIRED') {
+      window.dispatchEvent(new CustomEvent(SUBSCRIPTION_EXPIRED_EVENT))
+      return Promise.reject(new ApiError(status, EXPIRED_MESSAGE, code))
+    }
     return Promise.reject(new ApiError(status, message, code))
   },
 )
