@@ -8,6 +8,7 @@ import EditAllocationModal from '../../components/owner/EditAllocationModal'
 import RemoveBeneficiaryModal from '../../components/owner/RemoveBeneficiaryModal'
 import { useOwnerCatalog } from '../../hooks/useOwnerCatalog'
 import { filterPeople, getAssignableAssets, groupBeneficiariesByPerson } from '../../utils/catalog'
+import { isOwnerLockedByHandover, isVaultLockedByHandover } from '../../utils/handover'
 
 const pad2 = (value) => String(value).padStart(2, '0')
 
@@ -30,7 +31,7 @@ const onlyActive = (person) => ({ ...person, items: person.items.filter((item) =
 
 // Trang "Người thụ hưởng": gom theo từng người, tìm kiếm và chỉ định thêm người thụ hưởng
 export default function BeneficiariesPage() {
-  const { status, error, assets, beneficiaries, reload } = useOwnerCatalog()
+  const { status, error, vaults, selectedVault, selectVault, assets, beneficiaries, handovers, reload } = useOwnerCatalog()
   const [query, setQuery] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [action, setAction] = useState(null)
@@ -41,6 +42,10 @@ export default function BeneficiariesPage() {
   const visiblePeople = useMemo(() => filterPeople(people, query), [people, query])
   const assignableAssets = useMemo(() => getAssignableAssets(assets), [assets])
   const allocatedAssetCount = useMemo(() => new Set(beneficiaries.map((b) => b.assetId)).size, [beneficiaries])
+  const lockedByHandover = useMemo(
+    () => (selectedVault ? isVaultLockedByHandover(handovers, selectedVault.vaultId) : false) || isOwnerLockedByHandover(handovers),
+    [handovers, selectedVault],
+  )
 
   const finishAction = (title) => {
     setAction(null)
@@ -73,7 +78,7 @@ export default function BeneficiariesPage() {
     )
   }
 
-  const canAdd = assignableAssets.length > 0
+  const canAdd = assignableAssets.length > 0 && !lockedByHandover
 
   return (
     <div className="d-flex flex-column gap-4">
@@ -84,17 +89,39 @@ export default function BeneficiariesPage() {
           </h1>
           <p className="mb-0 fs-12 text-slate-500">Những người được chỉ định thừa hưởng tài sản số của bạn và tỷ lệ phân bổ.</p>
         </div>
-        <Button
-          type="button"
-          variant="primary"
-          className="av-btn av-btn-sm"
-          disabled={!canAdd}
-          title={canAdd ? undefined : 'Chưa có tài sản nào còn phần trăm chưa phân bổ'}
-          onClick={() => setIsModalOpen(true)}
-        >
-          <Plus size={16} aria-hidden="true" />
-          Thêm người thụ hưởng
-        </Button>
+        <div className="d-flex flex-wrap align-items-center gap-2">
+          {vaults.length >= 2 && selectedVault && (
+            <Form.Select
+              size="sm"
+              aria-label="Chọn kho"
+              value={selectedVault.vaultId}
+              onChange={(event) => selectVault(Number(event.target.value))}
+              style={{ width: 'auto', maxWidth: 220 }}
+            >
+              {vaults.map((item) => (
+                <option key={item.vaultId} value={item.vaultId}>
+                  {item.name}
+                </option>
+              ))}
+            </Form.Select>
+          )}
+          <Button
+            type="button"
+            variant="primary"
+            className="av-btn av-btn-sm"
+            disabled={!canAdd}
+            title={canAdd ? undefined : 'Chưa có tài sản nào còn phần trăm chưa phân bổ'}
+            onClick={() => setIsModalOpen(true)}
+          >
+            <Plus size={16} aria-hidden="true" />
+            Thêm người thụ hưởng
+          </Button>
+          {!canAdd && assets.length > 0 && !lockedByHandover && (
+            <p role="note" className="w-100 mb-0 fs-12 text-slate-500 text-end">
+              Tất cả tài sản trong kho đã phân bổ đủ 100%. Hãy bấm &quot;Sửa phân quyền&quot; để giảm tỷ lệ hiện tại hoặc thêm tài sản mới trước khi thêm người thụ hưởng.
+            </p>
+          )}
+        </div>
       </section>
 
       <div className="av-stat-grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' }}>

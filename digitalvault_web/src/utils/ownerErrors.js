@@ -8,6 +8,7 @@ export function conflictMessage(detail = '') {
   // Hạn mức gói phải xét trước vì câu "exceeds the supported quota range" chứa chữ "exceeds" của lỗi phân bổ
   const quota = parseQuotaError(detail)
   if (quota) return quotaMessage(quota)
+  if (/giấy chứng tử|báo tử|deceased/i.test(detail)) return detail
   if (/handover/i.test(detail)) return HANDOVER_BLOCK
   if (/exceeds/i.test(detail)) return 'Tổng tỷ lệ phân bổ không được vượt 100%.'
   if (/assignment/i.test(detail)) return 'Phân bổ này không còn hiệu lực.'

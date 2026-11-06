@@ -64,7 +64,7 @@ export default function VaultBanner({
         <button type="button" onClick={onCloseVault} disabled={!isActive || lockedByHandover || ownerLockedByHandover} className="av-link-btn fs-12">
           Đóng kho
         </button>
-        <button type="button" onClick={onCheckIn} className="av-ghost-btn is-brand">
+        <button type="button" onClick={onCheckIn} disabled={ownerLockedByHandover} className="av-ghost-btn is-brand">
           <Activity size={14} aria-hidden="true" />
           Điểm danh ngay
         </button>
