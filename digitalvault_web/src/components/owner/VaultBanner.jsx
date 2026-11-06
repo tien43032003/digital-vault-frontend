@@ -55,13 +55,13 @@ export default function VaultBanner({
             ))}
           </Form.Select>
         )}
-        <button type="button" onClick={onCreateVault} disabled={ownerLockedByHandover || lockedByHandover} className="av-link-btn fs-12">
+        <button type="button" onClick={onCreateVault} disabled={ownerLockedByHandover} className="av-link-btn fs-12">
           Tạo kho mới
         </button>
-        <button type="button" onClick={onEditVault} disabled={!isActive || lockedByHandover} className="av-link-btn fs-12">
+        <button type="button" onClick={onEditVault} disabled={!isActive || lockedByHandover || ownerLockedByHandover} className="av-link-btn fs-12">
           Sửa kho
         </button>
-        <button type="button" onClick={onCloseVault} disabled={!isActive || lockedByHandover} className="av-link-btn fs-12">
+        <button type="button" onClick={onCloseVault} disabled={!isActive || lockedByHandover || ownerLockedByHandover} className="av-link-btn fs-12">
           Đóng kho
         </button>
         <button type="button" onClick={onCheckIn} className="av-ghost-btn is-brand">

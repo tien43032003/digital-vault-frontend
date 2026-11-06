@@ -41,9 +41,13 @@ export const isCancellableStatus = (status) => ['Pending_Executor', 'Draft', 'Re
 export const isVaultLockedByHandover = (handovers, vaultId) =>
   (handovers ?? []).some((item) => item.vaultId === vaultId && !['Cancelled', 'Declined'].includes(item.status))
 
-// Chủ sở hữu bị khóa tạo kho mới khi đã có hồ sơ bàn giao đang xử lý / đã duyệt ở bất kỳ kho nào
+// Chủ sở hữu chỉ bị khóa tạo kho mới và thao tác trên toàn bộ các kho khi đã có hồ sơ bàn giao (chưa hủy/từ chối) đính kèm giấy chứng tử
 export const isOwnerLockedByHandover = (handovers) =>
-  (handovers ?? []).some((item) => !['Cancelled', 'Declined', 'Rejected'].includes(item.status))
+  (handovers ?? []).some(
+    (item) =>
+      !['Cancelled', 'Declined', 'Rejected'].includes(item.status) &&
+      (item.documents ?? []).some((doc) => doc.purpose === 'DeathCertificate'),
+  )
 
 // Chỉ ở các trạng thái này Executor mới được nộp thêm giấy chứng tử/bằng chứng và gửi thẩm định
 export const isEditableStatus = (status) => ['Draft', 'Rejected', 'Additional_Info'].includes(status)
