@@ -18,8 +18,29 @@ const EMPTY_FORM = {
 // Chuyển lỗi API đăng ký sang thông báo tiếng Việt
 function registerErrorMessage(error) {
   if (error?.status === 429) return 'Bạn đã thử quá nhiều lần. Vui lòng đợi 1 phút rồi thử lại.'
+  if (error?.message && error.message !== 'Đã có lỗi xảy ra, vui lòng thử lại.') return error.message
   if (error?.status === 400) return 'Thông tin đăng ký không hợp lệ. Vui lòng kiểm tra lại.'
   return error?.message || 'Đã có lỗi xảy ra, vui lòng thử lại.'
+}
+
+// Tách lỗi 400/409 từ BE về đúng trường đang gặp ngoại lệ (email, phone, identityNumber)
+function extractFieldError(error) {
+  if (error?.status !== 409 && error?.status !== 400) return null
+  const code = error?.code || ''
+  const msg = error?.message || ''
+  const lower = msg.toLowerCase()
+
+  if (code === 'PHONE_ALREADY_EXISTS' || code === 'INVALID_PHONE' || lower.includes('điện thoại') || lower.includes('phone')) {
+    return { field: 'phone', message: msg || 'Số điện thoại này đã được đăng ký.' }
+  }
+  if (code === 'IDENTITY_NUMBER_ALREADY_EXISTS' || code === 'INVALID_IDENTITY_NUMBER' || lower.includes('cccd') || lower.includes('identity')) {
+    return { field: 'identityNumber', message: msg || 'Số CCCD này đã được đăng ký.' }
+  }
+  if (code === 'EMAIL_ALREADY_EXISTS' || code === 'INVALID_EMAIL' || error?.status === 409 || lower.includes('email')) {
+    const emailMsg = msg && !lower.includes('already registered') ? msg : 'Email này đã được đăng ký.'
+    return { field: 'email', message: emailMsg }
+  }
+  return null
 }
 
 // Modal đăng ký tài khoản Vault Owner, hiển thị đè lên landing page
@@ -56,7 +77,8 @@ export default function RegisterModal({ open, onClose, onSuccess, onSwitchToLogi
       setForm(EMPTY_FORM)
       onSuccess(email)
     } catch (error) {
-      if (error?.status === 409) setErrors((prev) => ({ ...prev, email: 'Email này đã được đăng ký.' }))
+      const fieldError = extractFieldError(error)
+      if (fieldError) setErrors((prev) => ({ ...prev, [fieldError.field]: fieldError.message }))
       else setSubmitError(registerErrorMessage(error))
     } finally {
       setIsSubmitting(false)

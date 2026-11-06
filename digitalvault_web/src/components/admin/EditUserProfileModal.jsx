@@ -2,7 +2,7 @@ import { UserCog, X } from 'lucide-react'
 import { useState } from 'react'
 import { Alert, Button, Modal } from 'react-bootstrap'
 import { updateAdminUser } from '../../callapi/adminApi'
-import { adminErrorMessage, validateAdminProfile } from '../../utils/admin'
+import { adminErrorMessage, extractUserFieldError, validateAdminProfile } from '../../utils/admin'
 import TextField from '../common/TextField'
 
 // Hộp thoại Admin sửa họ tên, điện thoại và CCCD của một người dùng (email và vai trò sửa ở nơi khác); chỉ mount khi mở
@@ -37,6 +37,8 @@ export default function EditUserProfileModal({ user, onClose, onSaved }) {
       onSaved(await updateAdminUser(user.userId, form))
     } catch (caught) {
       setBusy(false)
+      const fieldError = extractUserFieldError(caught)
+      if (fieldError) setErrors((prev) => ({ ...prev, [fieldError.field]: fieldError.message }))
       setSubmitError(adminErrorMessage(caught))
     }
   }
