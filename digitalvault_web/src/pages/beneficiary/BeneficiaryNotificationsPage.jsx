@@ -10,6 +10,7 @@ import {
 } from '../../callapi/notificationApi'
 import { ErrorState, LoadingState, PageBanner } from '../../components/beneficiary/BeneficiaryUi'
 import { formatRelativeTime } from '../../utils/beneficiary'
+import { describeNotification, notificationTypeLabel } from '../../utils/notifications'
 import { formatDateTime } from '../../utils/proofOfLife'
 
 const byNewest = (a, b) => new Date(b.createdAt) - new Date(a.createdAt) || b.notificationId - a.notificationId
@@ -110,35 +111,38 @@ export default function BeneficiaryNotificationsPage() {
           </div>
         ) : (
           <ul className="list-unstyled mb-0 d-flex flex-column gap-2">
-            {visible.map((item) => (
-              <li key={item.notificationId} className={`av-inbox-row${item.isRead ? '' : ' is-unread'}`}>
-                <span className={`av-stat-icon ${item.isRead ? '' : 'is-brand'}`}>
-                  {item.isRead ? <MailOpen size={16} aria-hidden="true" /> : <BellRing size={16} aria-hidden="true" />}
-                </span>
-                <div className="flex-grow-1" style={{ minWidth: 0 }}>
-                  <div className="d-flex flex-wrap align-items-center gap-2">
-                    <p className="mb-0 fs-14 fw-semibold text-ink">{item.title || 'Thông báo hệ thống'}</p>
-                    {item.type && <span className="av-code-tag">{item.type}</span>}
-                    {!item.isRead && <span className="av-badge av-badge-info">Mới</span>}
+            {visible.map((item) => {
+              const info = describeNotification(item)
+              return (
+                <li key={item.notificationId} className={`av-inbox-row${item.isRead ? '' : ' is-unread'}`}>
+                  <span className={`av-stat-icon ${item.isRead ? '' : 'is-brand'}`}>
+                    {item.isRead ? <MailOpen size={16} aria-hidden="true" /> : <BellRing size={16} aria-hidden="true" />}
+                  </span>
+                  <div className="flex-grow-1" style={{ minWidth: 0 }}>
+                    <div className="d-flex flex-wrap align-items-center gap-2">
+                      <p className="mb-0 fs-14 fw-semibold text-ink">{info.title || 'Thông báo hệ thống'}</p>
+                      {item.type && <span className="av-code-tag">{notificationTypeLabel(item.type)}</span>}
+                      {!item.isRead && <span className="av-badge av-badge-info">Mới</span>}
+                    </div>
+                    {info.body && <p className="mb-0 mt-1 fs-13 text-slate-600" style={{ whiteSpace: 'pre-line' }}>{info.body}</p>}
+                    <p className="mb-0 mt-1 fs-11 text-slate-400" title={item.createdAt ? formatDateTime(item.createdAt) : undefined}>
+                      {formatRelativeTime(item.createdAt)}
+                    </p>
                   </div>
-                  {item.message && <p className="mb-0 mt-1 fs-13 text-slate-600" style={{ whiteSpace: 'pre-line' }}>{item.message}</p>}
-                  <p className="mb-0 mt-1 fs-11 text-slate-400" title={item.createdAt ? formatDateTime(item.createdAt) : undefined}>
-                    {formatRelativeTime(item.createdAt)}
-                  </p>
-                </div>
-                {!item.isRead && (
-                  <button
-                    type="button"
-                    className="av-ghost-btn"
-                    id={`notification-read-${item.notificationId}`}
-                    disabled={busyId !== null}
-                    onClick={() => markOne(item)}
-                  >
-                    {busyId === item.notificationId ? 'Đang lưu...' : 'Đánh dấu đã đọc'}
-                  </button>
-                )}
-              </li>
-            ))}
+                  {!item.isRead && (
+                    <button
+                      type="button"
+                      className="av-ghost-btn"
+                      id={`notification-read-${item.notificationId}`}
+                      disabled={busyId !== null}
+                      onClick={() => markOne(item)}
+                    >
+                      {busyId === item.notificationId ? 'Đang lưu...' : 'Đánh dấu đã đọc'}
+                    </button>
+                  )}
+                </li>
+              )
+            })}
           </ul>
         )}
       </section>

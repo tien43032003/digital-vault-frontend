@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { getLifeConfirmation, listOwnerHandovers } from '../callapi/ownerApi'
+import { getLifeConfirmation, getOwnerHandovers } from '../callapi/ownerApi'
 import { isOwnerLockedByHandover } from '../utils/handover'
 
 const INITIAL_STATE = { status: 'loading', data: null, lockedByHandover: false, error: '' }
@@ -12,13 +12,13 @@ export function useProofOfLife() {
 
   useEffect(() => {
     let cancelled = false
-    Promise.all([getLifeConfirmation(), listOwnerHandovers(1, 100).catch(() => ({ items: [] }))])
+    Promise.all([getLifeConfirmation(), getOwnerHandovers().catch(() => [])])
       .then(([data, handovers]) => {
         if (!cancelled) {
           setState({
             status: 'ready',
             data,
-            lockedByHandover: isOwnerLockedByHandover(handovers?.items),
+            lockedByHandover: isOwnerLockedByHandover(handovers),
             error: '',
           })
         }
