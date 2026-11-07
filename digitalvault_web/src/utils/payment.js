@@ -129,7 +129,7 @@ export function planFormToInput(form, original = null) {
 // Lý do máy chủ trả về; bỏ qua câu mặc định của axiosClient để không lặp lại thông báo chung
 const serverDetail = (error) => (error?.message && error.message !== DEFAULT_ERROR ? ` Chi tiết từ máy chủ: ${error.message}` : '')
 
-// Lỗi khi tạo, sửa hoặc xóa gói; action: 'save' | 'delete'
+// Lỗi khi tạo, sửa hoặc xóa gói; action: 'save' | 'delete' (ngừng bán gói đang bán) | 'delete-permanent' (xóa hẳn gói đã ngừng bán)
 export function adminPlanErrorMessage(error, action = 'save') {
   switch (error?.status) {
     case 400:
@@ -140,6 +140,7 @@ export function adminPlanErrorMessage(error, action = 'save') {
     case 404:
       return 'Không tìm thấy gói dịch vụ. Vui lòng tải lại danh sách.'
     case 409:
+      if (action === 'delete-permanent') return 'Gói đã có giao dịch hoặc người đăng ký nên không thể xóa hẳn. Bạn có thể giữ gói ở nhóm "Ngừng bán".'
       return action === 'delete'
         ? 'Gói đang được sử dụng nên không xóa được. Bạn có thể chuyển gói sang "Ngừng bán".'
         : 'Tên gói đã tồn tại hoặc dữ liệu đang xung đột.'

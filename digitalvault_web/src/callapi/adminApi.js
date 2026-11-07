@@ -123,8 +123,15 @@ export async function updateAdminPlan(planId, input) {
   return data
 }
 
-export async function deleteAdminPlan(planId) {
-  await axiosClient.delete(`/admin/subscription-plans/${planId}`)
+// Mặc định ngừng bán gói đang bán (xóa mềm); permanent: true xóa hẳn gói đã ngừng bán (DELETE /{id}/permanent)
+export async function deleteAdminPlan(planId, { permanent = false } = {}) {
+  await axiosClient.delete(permanent ? `/admin/subscription-plans/${planId}/permanent` : `/admin/subscription-plans/${planId}`)
+}
+
+// Xóa hàng loạt mọi gói đã ngừng bán; trả { deletedCount, deletedPlanIds, skippedPlanIds, message } (gói đã có giao dịch hoặc người đăng ký bị bỏ qua)
+export async function deleteInactivePlans() {
+  const { data } = await axiosClient.delete('/admin/subscription-plans/inactive')
+  return data
 }
 
 // Giao dịch thanh toán của mọi người dùng (PageDto { page, pageSize, total, items }); status/userId rỗng thì không lọc

@@ -8,6 +8,7 @@ import HandoverStatusBadge from '../../components/executor/HandoverStatusBadge'
 import CancelHandoverModal from '../../components/owner/CancelHandoverModal'
 import { useOwnerHandoverDetail } from '../../hooks/useOwnerHandoverDetail'
 import { MOCK_MODE } from '../../mocks/mode'
+import { vaultLabel } from '../../utils/executor'
 import { handoverCode, isCancellableStatus } from '../../utils/handover'
 import { formatDateTime } from '../../utils/proofOfLife'
 
@@ -74,7 +75,7 @@ export default function OwnerHandoverDetailPage({ mockMode = MOCK_MODE }) {
             <h1 className="mb-1 fw-bold text-ink" style={{ fontSize: 20, letterSpacing: '-0.02em' }}>
               {handoverCode(handover)}
             </h1>
-            <p className="mb-0 fs-12 text-slate-500">{`Kho #${handover.vaultId} · Tạo lúc ${formatDateTime(handover.initiatedAt)}`}</p>
+            <p className="mb-0 fs-12 text-slate-500">{`${vaultLabel(handover.vaultId, handover.vaultName)} · Tạo lúc ${formatDateTime(handover.initiatedAt)}`}</p>
             {handover.executorId && (
               <p className="mb-0 fs-12 text-slate-500">{`Người thi hành: ${executorName ?? `Executor #${handover.executorId}`}`}</p>
             )}
