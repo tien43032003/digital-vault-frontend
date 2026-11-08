@@ -68,6 +68,16 @@ describe('mock admin users list', () => {
     expect(data.items.every((user) => user.roles.includes('Executor'))).toBe(true)
   })
 
+  it('getUsers_UserIdFilter_ReturnsOnlyThatUser', async () => {
+    const { data } = await axiosClient.get('/admin/users', { params: { userId: '2' } })
+    expect(data.items.map((user) => user.userId)).toEqual([2])
+  })
+
+  it('getUsers_UserIdNotFound_ReturnsEmptyList', async () => {
+    const { data } = await axiosClient.get('/admin/users', { params: { userId: '99999' } })
+    expect(data.items).toEqual([])
+  })
+
   it('getUsers_StatusFilter_ReturnsOnlyThatStatus', async () => {
     await axiosClient.put('/admin/users/2/status', { status: 'Locked' })
     const { data } = await axiosClient.get('/admin/users', { params: { status: 'Locked' } })

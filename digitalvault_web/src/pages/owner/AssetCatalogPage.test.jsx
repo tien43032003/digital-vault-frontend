@@ -297,6 +297,12 @@ describe('AssetCatalogPage without vault', () => {
     await login('moi@example.com', 'Registration123!')
   }
 
+  // Người dùng mới chưa có gói thì được yêu cầu chọn gói trước khi tạo kho (xem AssetCatalogFirstVaultPlan.test); ở đây cấp sẵn gói miễn phí để kiểm tra riêng việc tạo kho
+  function giveFreePlan() {
+    const owner = getDb().users.find((user) => user.email === 'moi@example.com')
+    getDb().userSubscriptions = [{ subscriptionId: 1, userId: owner.userId, planId: 4, status: 'Active', startDate: new Date().toISOString(), endDate: new Date(Date.now() + 36500 * 86400000).toISOString() }]
+  }
+
   it('render_NoVault_ShowsCreateVaultPrompt', async () => {
     await loginAsNewOwner()
     renderPage()
@@ -306,6 +312,7 @@ describe('AssetCatalogPage without vault', () => {
 
   it('createVault_ValidName_ShowsNewVaultBanner', async () => {
     await loginAsNewOwner()
+    giveFreePlan()
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: 'Tạo kho đầu tiên' }))
     const dialog = screen.getByRole('dialog', { name: 'Tạo Kho Lưu Trữ Mới' })
@@ -317,6 +324,7 @@ describe('AssetCatalogPage without vault', () => {
 
   it('createVault_EmptyName_ShowsValidationError', async () => {
     await loginAsNewOwner()
+    giveFreePlan()
     renderPage()
     await userEvent.click(await screen.findByRole('button', { name: 'Tạo kho đầu tiên' }))
     const dialog = screen.getByRole('dialog', { name: 'Tạo Kho Lưu Trữ Mới' })

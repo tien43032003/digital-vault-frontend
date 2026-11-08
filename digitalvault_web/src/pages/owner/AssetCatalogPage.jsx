@@ -2,10 +2,12 @@ import { Lock } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { Alert, Button } from 'react-bootstrap'
 import { useNavigate } from 'react-router-dom'
+import { getMySubscription } from '../../callapi/paymentApi'
 import AppToast from '../../components/common/AppToast'
 import AddAssetModal from '../../components/owner/AddAssetModal'
 import AssetCard from '../../components/owner/AssetCard'
 import AssetFilters from '../../components/owner/AssetFilters'
+import ChoosePlanModal from '../../components/owner/ChoosePlanModal'
 import CloseVaultModal from '../../components/owner/CloseVaultModal'
 import CreateVaultModal from '../../components/owner/CreateVaultModal'
 import EditVaultModal from '../../components/owner/EditVaultModal'
@@ -13,6 +15,7 @@ import EditAssetModal from '../../components/owner/EditAssetModal'
 import Pagination from '../../components/owner/Pagination'
 import StatCards from '../../components/owner/StatCards'
 import VaultBanner from '../../components/owner/VaultBanner'
+import { useAdminResource } from '../../hooks/useAdminResource'
 import { useOwnerCatalog } from '../../hooks/useOwnerCatalog'
 import { useVaultExecutor } from '../../hooks/useVaultExecutor'
 import { buildStats, filterAssets, getTypeTabs, paginate } from '../../utils/catalog'
@@ -26,6 +29,7 @@ export default function AssetCatalogPage() {
   const navigate = useNavigate()
   const { status, error, vaults, assets, beneficiaries, handovers, assetsLoading, selectedVault, selectVault, reload } = catalog
   const executor = useVaultExecutor(selectedVault?.vaultId ?? null)
+  const subscription = useAdminResource(getMySubscription)
 
   const [query, setQuery] = useState('')
   const [type, setType] = useState('all')
@@ -42,6 +46,11 @@ export default function AssetCatalogPage() {
   const pageData = paginate(filtered, page, pageSize)
 
   const closeModal = () => setModal(null)
+
+  // Người dùng mới (chưa có kho nào) và chưa có gói đang hiệu lực thì phải chọn gói trước khi tạo kho đầu tiên.
+  // Không kiểm tra được gói (lỗi mạng hoặc máy chủ) thì không chặn, để BE quyết định khi tạo kho.
+  const needsPlanFirst = vaults.length === 0 && subscription.data?.hasActiveSubscription === false
+  const openCreateVault = () => setModal(needsPlanFirst ? 'plan' : 'vault')
 
   const handleQueryChange = (value) => {
     setQuery(value)
@@ -109,14 +118,19 @@ export default function AssetCatalogPage() {
     )
   }
 
-  const createVaultModal = <CreateVaultModal open={modal === 'vault'} onClose={closeModal} onCreated={handleVaultCreated} />
+  const createVaultModal = (
+    <>
+      <CreateVaultModal open={modal === 'vault'} onClose={closeModal} onCreated={handleVaultCreated} />
+      {modal === 'plan' && <ChoosePlanModal onClose={closeModal} onContinueFree={() => setModal('vault')} />}
+    </>
+  )
 
   if (!selectedVault) {
     return (
       <>
         <section className="av-panel av-empty">
           <p className="mb-3">Bạn chưa có kho lưu trữ nào.</p>
-          <Button type="button" variant="primary" className="av-btn av-btn-sm" onClick={() => setModal('vault')}>
+          <Button type="button" variant="primary" className="av-btn av-btn-sm" onClick={openCreateVault}>
             Tạo kho đầu tiên
           </Button>
         </section>
@@ -132,7 +146,7 @@ export default function AssetCatalogPage() {
         vaults={vaults}
         onSelectVault={selectVault}
         onAddAsset={() => setModal('asset')}
-        onCreateVault={() => setModal('vault')}
+        onCreateVault={openCreateVault}
         onEditVault={() => setModal('editVault')}
         onCloseVault={() => setModal('closeVault')}
         onCheckIn={() => navigate('/owner/proof-of-life?ping=1')}

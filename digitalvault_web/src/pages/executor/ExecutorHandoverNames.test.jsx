@@ -31,7 +31,7 @@ const handover = {
   ownerName: 'Phạm Nhật Tiến',
   owner: { userId: 5, fullName: 'Phạm Nhật Tiến' },
   cases: [
-    { handoverId: 8, assetId: 30, assetName: 'Ví lạnh', beneficiaryId: 27, status: 'Completed' },
+    { handoverId: 8, assetId: 30, assetName: 'Ví lạnh', beneficiaryId: 27, beneficiaryName: 'Lê Văn B', allocationPercentage: 60, status: 'Completed' },
     { handoverId: 9, assetId: 31, beneficiaryId: 28, status: 'Completed' },
   ],
 }
@@ -59,6 +59,24 @@ describe('Executor: hiển thị tên thay cho ID', () => {
     expect(within(table).getByText('Ví lạnh')).toBeInTheDocument()
     // Chưa có tên (BE không trả assetName) thì dùng ID
     expect(within(table).getByText('Tài sản #31')).toBeInTheDocument()
+  })
+
+  it('detail_Loaded_ShowsBeneficiaryNameAndAllocationPercentage', async () => {
+    render(
+      <MemoryRouter initialEntries={['/executor/handovers/7']}>
+        <Routes>
+          <Route path="/executor/handovers/:requestId" element={<ExecutorHandoverDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    const table = await screen.findByRole('table', { name: 'Tài sản và người thụ hưởng' })
+    expect(within(table).getByRole('columnheader', { name: 'Tỉ lệ phân bổ' })).toBeInTheDocument()
+    const rows = within(table).getAllByRole('row').slice(1)
+    expect(within(rows[0]).getByText('Lê Văn B')).toBeInTheDocument()
+    expect(within(rows[0]).getByText('60%')).toBeInTheDocument()
+    // Thiếu tên thì dùng ID, thiếu tỉ lệ thì hiện dấu gạch
+    expect(within(rows[1]).getByText('Người thụ hưởng #28')).toBeInTheDocument()
+    expect(within(rows[1]).getByText('—')).toBeInTheDocument()
   })
 
   it('detail_AssignmentsFail_FallsBackToVaultId', async () => {
