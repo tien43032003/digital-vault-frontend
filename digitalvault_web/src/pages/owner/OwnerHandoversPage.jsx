@@ -9,6 +9,7 @@ import CancelHandoverModal from '../../components/owner/CancelHandoverModal'
 import CreateOwnerHandoverModal from '../../components/owner/CreateOwnerHandoverModal'
 import { useOwnerHandovers } from '../../hooks/useOwnerHandovers'
 import { MOCK_MODE } from '../../mocks/mode'
+import { vaultLabel } from '../../utils/executor'
 import { filterHandovers, handoverCode, isCancellableStatus } from '../../utils/handover'
 import { formatDateTime } from '../../utils/proofOfLife'
 
@@ -105,7 +106,7 @@ export default function OwnerHandoversPage({ mockMode = MOCK_MODE }) {
                     <td className="fw-semibold text-ink">
                       <Link to={`/owner/handovers/${item.requestId}`} className="text-ink">{handoverCode(item)}</Link>
                     </td>
-                    <td>{`Kho #${item.vaultId}`}</td>
+                    <td>{vaultLabel(item.vaultId, item.vaultName)}</td>
                     <td className="text-nowrap">{formatDateTime(item.initiatedAt)}</td>
                     <td>{item.executorName ?? (item.executorId ? `Executor #${item.executorId}` : '—')}</td>
                     <td>{`${new Set(item.cases.map((entry) => entry.assetId)).size} tài sản`}</td>

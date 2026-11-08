@@ -14,10 +14,7 @@ import {
 import { useCallback, useState } from 'react'
 import { Alert, Badge, Button, Col, Modal, Row, Table } from 'react-bootstrap'
 import { Link, useParams } from 'react-router-dom'
-import {
-  downloadLegalAssetDocument,
-  downloadLegalHandoverDocument,
-} from '../../callapi/legalApi'
+import { downloadLegalHandoverDocument } from '../../callapi/legalApi'
 import AppToast from '../../components/common/AppToast'
 import HandoverStatusBadge from '../../components/executor/HandoverStatusBadge'
 import ReviewActionModal from '../../components/legal/ReviewActionModal'
@@ -69,7 +66,6 @@ export default function LegalHandoverDetailPage() {
   const [reviewResult, setReviewResult] = useState(null)
   const [resultModalOpen, setResultModalOpen] = useState(false)
   const [downloadingDocId, setDownloadingDocId] = useState(null)
-  const [downloadingAssetDocId, setDownloadingAssetDocId] = useState(null)
   const [downloadError, setDownloadError] = useState('')
   const [toast, setToast] = useState(null)
 
@@ -90,23 +86,6 @@ export default function LegalHandoverDetailPage() {
       setDownloadError(`Không thể tải ${doc.fileName || 'tài liệu'}: ${err?.message || 'Lỗi kết nối'}`)
     } finally {
       setDownloadingDocId(null)
-    }
-  }
-
-  // Tải tài liệu của tài sản
-  const handleDownloadAssetDoc = async (doc) => {
-    setDownloadingAssetDocId(doc.documentId)
-    setDownloadError('')
-    try {
-      const { blob } = await downloadLegalAssetDocument(handover.requestId, doc.documentId)
-      downloadBlob(doc.fileName || `asset-doc-${doc.documentId}.bin`, blob)
-      setToast({
-        title: `Đã tải xuống tài liệu tài sản ${doc.fileName || doc.documentId}`,
-      })
-    } catch (err) {
-      setDownloadError(`Không thể tải tài liệu tài sản: ${err?.message || 'Lỗi kết nối'}`)
-    } finally {
-      setDownloadingAssetDocId(null)
     }
   }
 
@@ -431,22 +410,24 @@ export default function LegalHandoverDetailPage() {
                                       <Lock size={10} /> Đã mã hóa
                                     </span>
                                   )}
+                                  {doc.signatureValid !== undefined && doc.signatureValid !== null && (
+                                    <span className={`badge ${doc.signatureValid ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning'}`}>
+                                      {doc.signatureValid ? 'Chữ ký Owner hợp lệ' : 'Chữ ký không hợp lệ'}
+                                    </span>
+                                  )}
                                   {doc.status && doc.status !== 'Active' && <span className="badge bg-light text-secondary border">{doc.status}</span>}
                                 </div>
                               </div>
                             </div>
 
-                            <Button
-                              type="button"
-                              variant="outline-primary"
-                              size="sm"
-                              className="d-inline-flex align-items-center gap-1 flex-shrink-0 fs-12 px-3"
-                              disabled={downloadingAssetDocId === doc.documentId}
-                              onClick={() => handleDownloadAssetDoc(doc)}
+                            {/* BE khóa tải nội dung tài sản với người thẩm định (có thể chứa seed phrase, khóa bí mật): chỉ xem trạng thái chữ ký */}
+                            <span
+                              className="badge bg-light text-secondary border d-inline-flex align-items-center gap-1 flex-shrink-0 px-2 py-2"
+                              title="Nội dung tài sản được niêm phong bảo mật, chỉ giải mã cho Người thụ hưởng hợp pháp sau khi hoàn tất bàn giao"
                             >
-                              <Download size={13} />
-                              {downloadingAssetDocId === doc.documentId ? 'Đang tải...' : 'Tải về'}
-                            </Button>
+                              <Lock size={12} />
+                              Niêm phong bảo mật
+                            </span>
                           </div>
                         ))}
                       </div>

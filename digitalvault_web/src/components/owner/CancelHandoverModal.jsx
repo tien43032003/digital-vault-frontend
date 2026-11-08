@@ -2,6 +2,7 @@ import { ShieldAlert, X } from 'lucide-react'
 import { useState } from 'react'
 import { Alert, Button, Modal } from 'react-bootstrap'
 import { cancelHandover } from '../../callapi/ownerApi'
+import { vaultLabel } from '../../utils/executor'
 import { handoverCode } from '../../utils/handover'
 
 function cancelErrorMessage(error) {
@@ -50,7 +51,7 @@ export default function CancelHandoverModal({ handover, onClose, onCancelled }) 
 
       <div className="av-modal-body d-flex flex-column gap-3">
         <p className="mb-0 fs-13 text-slate-600">
-          {`Bạn sắp hủy hồ sơ ${handoverCode(handover)} của Kho #${handover.vaultId}. Người thi hành sẽ phải tạo hồ sơ mới nếu muốn bàn giao lại; sau khi hủy bạn có thể chỉnh sửa tài sản, phân bổ và giấy tờ của kho như bình thường.`}
+          {`Bạn sắp hủy hồ sơ ${handoverCode(handover)} của ${vaultLabel(handover.vaultId, handover.vaultName)}. Người thi hành sẽ phải tạo hồ sơ mới nếu muốn bàn giao lại; sau khi hủy bạn có thể chỉnh sửa tài sản, phân bổ và giấy tờ của kho như bình thường.`}
         </p>
         {error && <Alert variant="danger" className="av-alert mb-0">{error}</Alert>}
       </div>

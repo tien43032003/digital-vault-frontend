@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react'
 import { Alert, Button } from 'react-bootstrap'
 import { getAdminPlans, updateAdminPlan } from '../../callapi/adminApi'
 import AdminResourceState from '../../components/admin/AdminResourceState'
+import DeleteInactivePlansModal from '../../components/admin/DeleteInactivePlansModal'
 import DeletePlanModal from '../../components/admin/DeletePlanModal'
 import PaymentTransactionsPanel from '../../components/admin/PaymentTransactionsPanel'
 import PlanFormModal from '../../components/admin/PlanFormModal'
@@ -24,7 +25,7 @@ export default function AdminPlansPage() {
   const [planView, setPlanView] = useState('active')
   const [resellingId, setResellingId] = useState(null)
   const [actionError, setActionError] = useState('')
-  const { data: allPlans, error, loading, reload } = useAdminResource(getAdminPlans)
+  const { data: allPlans, error, loading, reload, apply } = useAdminResource(getAdminPlans)
   const activePlans = allPlans ? allPlans.filter((plan) => plan.isActive) : []
   const inactivePlans = allPlans ? allPlans.filter((plan) => !plan.isActive) : []
   const plans = allPlans && (planView === 'active' ? activePlans : inactivePlans)
@@ -42,9 +43,34 @@ export default function AdminPlansPage() {
     reload()
   }
 
-  const handleDeleted = (plan) => {
+  const handleDeleted = async (plan) => {
     closeDialog()
-    setToast({ title: 'Đã ngừng bán gói dịch vụ', detail: `${plan.planName} · lịch sử giao dịch vẫn được giữ` })
+    if (plan.isActive) {
+      setToast({ title: 'Đã ngừng bán gói dịch vụ', detail: `${plan.planName} · lịch sử giao dịch vẫn được giữ` })
+      reload()
+      return
+    }
+    // Gói đã ngừng bán: tải lại danh sách để biết máy chủ đã xóa hẳn hay vẫn giữ gói (gói đã có giao dịch)
+    try {
+      const fresh = await getAdminPlans()
+      apply(fresh)
+      const kept = fresh.some((item) => item.planId === plan.planId)
+      setToast(
+        kept
+          ? { title: 'Máy chủ vẫn giữ gói này', detail: `${plan.planName} · gói chưa bị xóa hẳn, có thể đã có giao dịch` }
+          : { title: 'Đã xóa vĩnh viễn gói dịch vụ', detail: plan.planName },
+      )
+    } catch {
+      setToast({ title: 'Đã gửi yêu cầu xóa gói', detail: plan.planName })
+      reload()
+    }
+  }
+
+  // Sau khi xóa hàng loạt: báo số gói đã xóa và số gói được giữ lại, rồi tải lại danh sách
+  const handleInactiveDeleted = (result) => {
+    closeDialog()
+    const kept = result.skippedPlanIds?.length ?? 0
+    setToast({ title: `Đã xóa ${result.deletedCount} gói ngừng bán`, detail: kept > 0 ? `${kept} gói được giữ lại vì đã có giao dịch` : undefined })
     reload()
   }
 
@@ -104,12 +130,20 @@ export default function AdminPlansPage() {
           <AdminResourceState error={error} loading={loading} hasData={Boolean(plans)} loadingText="Đang tải danh sách gói dịch vụ..." onRetry={reload} />
 
           {allPlans && (
-            <div className="av-tabs" role="group" aria-label="Nhóm gói dịch vụ">
-              {PLAN_VIEWS.map((item) => (
-                <button key={item.key} type="button" className="av-tab" aria-pressed={planView === item.key} onClick={() => setPlanView(item.key)}>
-                  {`${item.label} (${item.count})`}
+            <div className="d-flex flex-wrap align-items-center justify-content-between gap-2">
+              <div className="av-tabs" role="group" aria-label="Nhóm gói dịch vụ">
+                {PLAN_VIEWS.map((item) => (
+                  <button key={item.key} type="button" className="av-tab" aria-pressed={planView === item.key} onClick={() => setPlanView(item.key)}>
+                    {`${item.label} (${item.count})`}
+                  </button>
+                ))}
+              </div>
+              {planView === 'inactive' && inactivePlans.length > 0 && (
+                <button type="button" className="av-ghost-btn" onClick={() => setDialog({ type: 'delete-inactive' })}>
+                  <Trash2 size={14} aria-hidden="true" />
+                  Xóa tất cả gói ngừng bán
                 </button>
-              ))}
+              )}
             </div>
           )}
 
@@ -177,6 +211,12 @@ export default function AdminPlansPage() {
                               {resellingId === plan.planId ? 'Đang xử lý...' : 'Bán lại'}
                             </button>
                           )}
+                          {!plan.isActive && (
+                            <button type="button" className="av-ghost-btn" aria-label={`Xóa vĩnh viễn gói ${plan.planName}`} onClick={() => setDialog({ type: 'delete', plan })}>
+                              <Trash2 size={14} aria-hidden="true" />
+                              Xóa
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -195,6 +235,7 @@ export default function AdminPlansPage() {
       {dialog?.type === 'create' && <PlanFormModal onClose={closeDialog} onSaved={handleSaved} />}
       {dialog?.type === 'edit' && <PlanFormModal plan={dialog.plan} onClose={closeDialog} onSaved={handleSaved} />}
       {dialog?.type === 'delete' && <DeletePlanModal plan={dialog.plan} onClose={closeDialog} onDeleted={handleDeleted} />}
+      {dialog?.type === 'delete-inactive' && <DeleteInactivePlansModal count={inactivePlans.length} onClose={closeDialog} onFinished={handleInactiveDeleted} />}
 
       <AppToast show={Boolean(toast)} onClose={closeToast} title={toast?.title} detail={toast?.detail} />
     </div>

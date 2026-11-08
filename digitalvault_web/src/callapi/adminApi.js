@@ -2,11 +2,13 @@ import axiosClient from './axiosClient'
 
 // API cổng System Admin của BE (role Admin): người dùng và nhật ký kiểm toán. Danh sách trả PageDto { page, pageSize, items }.
 
-// role/status rỗng thì không gửi lên BE (BE bỏ qua bộ lọc khi chuỗi rỗng)
-export async function getAdminUsers({ page = 1, pageSize = 20, role = '', status = '' } = {}) {
+// role/status/userId rỗng thì không gửi lên BE (BE bỏ qua bộ lọc khi chuỗi rỗng); userId chấp nhận cả dạng "#15"
+export async function getAdminUsers({ page = 1, pageSize = 20, role = '', status = '', userId = '' } = {}) {
   const params = { page, pageSize }
   if (role) params.role = role
   if (status) params.status = status
+  const trimmedId = String(userId ?? '').trim().replace(/^#/, '')
+  if (trimmedId) params.userId = trimmedId
   const { data } = await axiosClient.get('/admin/users', { params })
   return data
 }
@@ -123,8 +125,15 @@ export async function updateAdminPlan(planId, input) {
   return data
 }
 
-export async function deleteAdminPlan(planId) {
-  await axiosClient.delete(`/admin/subscription-plans/${planId}`)
+// Mặc định ngừng bán gói đang bán (xóa mềm); permanent: true xóa hẳn gói đã ngừng bán (DELETE /{id}/permanent)
+export async function deleteAdminPlan(planId, { permanent = false } = {}) {
+  await axiosClient.delete(permanent ? `/admin/subscription-plans/${planId}/permanent` : `/admin/subscription-plans/${planId}`)
+}
+
+// Xóa hàng loạt mọi gói đã ngừng bán; trả { deletedCount, deletedPlanIds, skippedPlanIds, message } (gói đã có giao dịch hoặc người đăng ký bị bỏ qua)
+export async function deleteInactivePlans() {
+  const { data } = await axiosClient.delete('/admin/subscription-plans/inactive')
+  return data
 }
 
 // Giao dịch thanh toán của mọi người dùng (PageDto { page, pageSize, total, items }); status/userId rỗng thì không lọc

@@ -1,12 +1,11 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { downloadLegalAssetDocument, getLegalHandover } from '../../callapi/legalApi'
+import { getLegalHandover } from '../../callapi/legalApi'
 import LegalHandoverDetailPage from './LegalHandoverDetailPage'
 
 vi.mock('../../callapi/legalApi', () => ({
   getLegalHandover: vi.fn(),
-  downloadLegalAssetDocument: vi.fn(),
   downloadLegalHandoverDocument: vi.fn(),
   approveLegalHandover: vi.fn(),
   rejectLegalHandover: vi.fn(),
@@ -22,7 +21,7 @@ const handover = {
   documents: [],
   cases: [{ handoverId: 5, assetId: 27, assetName: 'Ví crypto', beneficiaryId: 27, status: 'Pending' }],
   assets: [
-    { assetId: 27, name: 'Ví crypto', type: 'CryptoWallet', description: 'Ví lạnh', status: 'Active', documents: [{ documentId: 11, fileName: 'seed.pdf', fileType: 'application/pdf', isEncrypted: true, status: 'Active' }] },
+    { assetId: 27, name: 'Ví crypto', type: 'CryptoWallet', description: 'Ví lạnh', status: 'Active', documents: [{ documentId: 11, fileName: 'seed.pdf', fileType: 'application/pdf', isEncrypted: true, signatureValid: true, status: 'Active' }] },
     { assetId: 28, name: 'Sổ tiết kiệm', type: 'BankAccount', status: 'Active', documents: [] },
   ],
 }
@@ -52,12 +51,34 @@ describe('LegalHandoverDetailPage - tài sản của chủ kho', () => {
     expect(screen.getByText('Tài sản này chưa có giấy tờ nào.')).toBeInTheDocument()
   })
 
-  it('assets_DownloadClicked_UsesAssetDocumentsEndpoint', async () => {
-    downloadLegalAssetDocument.mockResolvedValue({ blob: new Blob(['x']), signatureValid: true })
+  it('assets_Document_HasNoDownloadButtonButShowsSealedBadge', async () => {
     renderPage()
     const card = (await screen.findByText('seed.pdf')).closest('.border')
-    fireEvent.click(within(card).getByRole('button', { name: /Tải về/ }))
-    await waitFor(() => expect(downloadLegalAssetDocument).toHaveBeenCalledWith(4, 11))
+    expect(within(card).queryByRole('button', { name: /Tải về/ })).not.toBeInTheDocument()
+    expect(within(card).getByText('Niêm phong bảo mật')).toBeInTheDocument()
+  })
+
+  it('assets_SignatureValid_ShowsOwnerSignatureBadge', async () => {
+    renderPage()
+    expect(await screen.findByText('Chữ ký Owner hợp lệ')).toBeInTheDocument()
+  })
+
+  it('assets_SignatureInvalid_ShowsInvalidBadge', async () => {
+    const [first, second] = handover.assets
+    const doc = { ...first.documents[0], signatureValid: false }
+    getLegalHandover.mockResolvedValue({ ...handover, assets: [{ ...first, documents: [doc] }, second] })
+    renderPage()
+    expect(await screen.findByText('Chữ ký không hợp lệ')).toBeInTheDocument()
+  })
+
+  it('assets_SignatureUnknown_ShowsNoSignatureBadge', async () => {
+    const [first, second] = handover.assets
+    const doc = { ...first.documents[0] }
+    delete doc.signatureValid
+    getLegalHandover.mockResolvedValue({ ...handover, assets: [{ ...first, documents: [doc] }, second] })
+    renderPage()
+    await screen.findByText('seed.pdf')
+    expect(screen.queryByText(/Chữ ký/)).not.toBeInTheDocument()
   })
 
   it('assets_None_ShowsEmptyMessage', async () => {

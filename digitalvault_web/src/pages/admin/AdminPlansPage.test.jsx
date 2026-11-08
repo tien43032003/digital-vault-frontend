@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createAdminPlan,
   deleteAdminPlan,
+  deleteInactivePlans,
   getAdminPlans,
   getPaymentTransaction,
   getPaymentTransactions,
@@ -15,6 +16,7 @@ vi.mock('../../callapi/adminApi', () => ({
   createAdminPlan: vi.fn(),
   updateAdminPlan: vi.fn(),
   deleteAdminPlan: vi.fn(),
+  deleteInactivePlans: vi.fn(),
   getPaymentTransactions: vi.fn(),
   getPaymentTransaction: vi.fn(),
 }))
@@ -98,6 +100,103 @@ describe('AdminPlansPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Ngừng bán/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Bán lại gói Gói 2' }))
     expect(await screen.findByText(/Không tìm thấy gói dịch vụ/)).toBeInTheDocument()
+  })
+
+  const openPermanentDelete = async (name) => {
+    render(<AdminPlansPage />)
+    await screen.findByRole('table', { name: 'Danh sách gói dịch vụ' })
+    fireEvent.click(screen.getByRole('button', { name: /^Ngừng bán/ }))
+    fireEvent.click(screen.getByRole('button', { name: `Xóa vĩnh viễn gói ${name}` }))
+    return screen.getByRole('dialog', { name: 'Xóa Vĩnh Viễn Gói Dịch Vụ' })
+  }
+
+  it('deletePermanent_InactivePlan_HasDeleteButtonAndPermanentWording', async () => {
+    const dialog = await openPermanentDelete('Gói 2')
+    expect(dialog).toHaveTextContent('xóa vĩnh viễn gói Gói 2')
+    expect(within(dialog).getByRole('button', { name: 'Xóa vĩnh viễn' })).toBeInTheDocument()
+  })
+
+  it('deletePermanent_ActivePlan_HasNoPermanentDeleteButton', async () => {
+    render(<AdminPlansPage />)
+    await screen.findByRole('table', { name: 'Danh sách gói dịch vụ' })
+    expect(screen.queryByRole('button', { name: /Xóa vĩnh viễn/ })).not.toBeInTheDocument()
+  })
+
+  it('deletePermanent_ServerRemovesPlan_ShowsPermanentlyDeletedToastAndDropsRow', async () => {
+    deleteAdminPlan.mockResolvedValue(undefined)
+    const dialog = await openPermanentDelete('Gói 2')
+    getAdminPlans.mockResolvedValue([plan(1)])
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Xóa vĩnh viễn' }))
+    await waitFor(() => expect(deleteAdminPlan).toHaveBeenCalledWith(2, { permanent: true }))
+    expect(await screen.findByText('Đã xóa vĩnh viễn gói dịch vụ')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Xóa vĩnh viễn gói Gói 2' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Ngừng bán (0)' })).toBeInTheDocument()
+  })
+
+  it('deletePermanent_ServerKeepsPlan_TellsAdminThePlanWasNotRemoved', async () => {
+    deleteAdminPlan.mockResolvedValue(undefined)
+    const dialog = await openPermanentDelete('Gói 2')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Xóa vĩnh viễn' }))
+    expect(await screen.findByText('Máy chủ vẫn giữ gói này')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Xóa vĩnh viễn gói Gói 2' })).toBeInTheDocument()
+  })
+
+  it('deletePermanent_Server409_ExplainsPlanIsInUseAndKeepsDialogOpen', async () => {
+    deleteAdminPlan.mockRejectedValue({ status: 409, message: 'x' })
+    const dialog = await openPermanentDelete('Gói 2')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Xóa vĩnh viễn' }))
+    expect(await within(dialog).findByText(/không thể xóa hẳn/)).toBeInTheDocument()
+  })
+
+  it('deletePermanent_Cancel_ClosesWithoutCallingApi', async () => {
+    const dialog = await openPermanentDelete('Gói 2')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Hủy' }))
+    expect(deleteAdminPlan).not.toHaveBeenCalled()
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  })
+
+  const openBulkDelete = async () => {
+    render(<AdminPlansPage />)
+    await screen.findByRole('table', { name: 'Danh sách gói dịch vụ' })
+    fireEvent.click(screen.getByRole('button', { name: /^Ngừng bán/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Xóa tất cả gói ngừng bán' }))
+    return screen.getByRole('dialog', { name: 'Xóa Tất Cả Gói Ngừng Bán' })
+  }
+
+  it('bulkDelete_ActiveGroup_HasNoBulkButton', async () => {
+    render(<AdminPlansPage />)
+    await screen.findByRole('table', { name: 'Danh sách gói dịch vụ' })
+    expect(screen.queryByRole('button', { name: 'Xóa tất cả gói ngừng bán' })).not.toBeInTheDocument()
+  })
+
+  it('bulkDelete_Confirm_CallsInactiveEndpointAndShowsDeletedAndSkippedCounts', async () => {
+    deleteInactivePlans.mockResolvedValue({ deletedCount: 1, deletedPlanIds: [2], skippedPlanIds: [5, 6], message: 'Done' })
+    const dialog = await openBulkDelete()
+    expect(dialog).toHaveTextContent('1 gói')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Xóa tất cả' }))
+    await waitFor(() => expect(deleteInactivePlans).toHaveBeenCalledTimes(1))
+    expect(await within(dialog).findByText('Đã xóa 1 gói.')).toBeInTheDocument()
+    expect(within(dialog).getByText('2 gói được giữ lại vì đã có giao dịch hoặc người đăng ký.')).toBeInTheDocument()
+    getAdminPlans.mockResolvedValue([plan(1)])
+    // Có hai nút "Đóng" (dấu X ở đầu và nút ở chân hộp thoại): bấm nút ở chân
+    fireEvent.click(within(dialog).getAllByRole('button', { name: 'Đóng' }).at(-1))
+    expect(await screen.findByText('Đã xóa 1 gói ngừng bán')).toBeInTheDocument()
+    await waitFor(() => expect(getAdminPlans).toHaveBeenCalledTimes(2))
+  })
+
+  it('bulkDelete_Cancel_ClosesWithoutCallingApi', async () => {
+    const dialog = await openBulkDelete()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Hủy' }))
+    expect(deleteInactivePlans).not.toHaveBeenCalled()
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  })
+
+  it('bulkDelete_ServerError_ShowsErrorAndKeepsDialogOpen', async () => {
+    deleteInactivePlans.mockRejectedValue({ status: 403, message: 'x' })
+    const dialog = await openBulkDelete()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Xóa tất cả' }))
+    expect(await within(dialog).findByRole('alert')).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Xóa tất cả' })).toBeEnabled()
   })
 
   it('plans_AllInactive_ShowsHintToRevealThem', async () => {

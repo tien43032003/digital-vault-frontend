@@ -18,10 +18,10 @@ import { formatDate } from '../../utils/proofOfLife'
 
 const BADGE_CLASS = { ok: 'av-badge-ok', warn: 'av-badge-warn', info: 'av-badge-info', muted: 'av-badge-muted' }
 
-// Trang "Quản lý người dùng" của Admin: lọc theo vai trò/trạng thái, thêm người dùng, đổi vai trò và trạng thái
+// Trang "Quản lý người dùng" của Admin: tìm theo User ID, lọc theo vai trò/trạng thái, thêm người dùng, đổi vai trò và trạng thái
 export default function AdminUsersPage({ mockMode = MOCK_MODE }) {
   const { user: currentUser } = useAuth()
-  const [filters, setFilters] = useState({ role: '', status: '' })
+  const [filters, setFilters] = useState({ role: '', status: '', userId: '' })
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [modal, setModal] = useState(null)
@@ -67,6 +67,16 @@ export default function AdminUsersPage({ mockMode = MOCK_MODE }) {
 
       <section className="av-panel d-flex flex-column gap-3" aria-label="Danh sách người dùng">
         <div className="row g-2">
+          <div className="col-12 col-lg-4">
+            <Form.Control
+              type="number"
+              min={1}
+              placeholder="Tìm theo User ID (VD: 15)..."
+              aria-label="Tìm theo User ID"
+              value={filters.userId}
+              onChange={(event) => setFilter('userId', event.target.value)}
+            />
+          </div>
           <div className="col-6 col-lg-3">
             <Form.Select aria-label="Lọc theo vai trò" value={filters.role} onChange={(event) => setFilter('role', event.target.value)}>
               <option value="">Tất cả vai trò</option>
@@ -124,7 +134,10 @@ export default function AdminUsersPage({ mockMode = MOCK_MODE }) {
                   return (
                     <tr key={user.userId}>
                       <td>
-                        <p className="mb-0 fw-semibold text-ink">{user.fullName}</p>
+                        <p className="mb-0 fw-semibold text-ink">
+                          <span className="text-slate-400 me-1">{`#${user.userId}`}</span>
+                          {user.fullName}
+                        </p>
                         <p className="mb-0 fs-12 text-slate-500">{user.email}</p>
                       </td>
                       <td>{user.phone || '—'}</td>
