@@ -2,11 +2,13 @@ import axiosClient from './axiosClient'
 
 // API cổng System Admin của BE (role Admin): người dùng và nhật ký kiểm toán. Danh sách trả PageDto { page, pageSize, items }.
 
-// role/status rỗng thì không gửi lên BE (BE bỏ qua bộ lọc khi chuỗi rỗng)
-export async function getAdminUsers({ page = 1, pageSize = 20, role = '', status = '' } = {}) {
+// role/status/userId rỗng thì không gửi lên BE (BE bỏ qua bộ lọc khi chuỗi rỗng); userId chấp nhận cả dạng "#15"
+export async function getAdminUsers({ page = 1, pageSize = 20, role = '', status = '', userId = '' } = {}) {
   const params = { page, pageSize }
   if (role) params.role = role
   if (status) params.status = status
+  const trimmedId = String(userId ?? '').trim().replace(/^#/, '')
+  if (trimmedId) params.userId = trimmedId
   const { data } = await axiosClient.get('/admin/users', { params })
   return data
 }

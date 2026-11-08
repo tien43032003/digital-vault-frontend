@@ -87,21 +87,6 @@ export async function downloadLegalHandoverDocument(requestId, documentId) {
 }
 
 /**
- * Tải tài liệu đính kèm của tài sản trong hồ sơ bàn giao
- * @param {number|string} requestId
- * @param {number|string} documentId
- * @returns {Promise<{ blob: Blob }>}
- */
-export async function downloadLegalAssetDocument(requestId, documentId) {
-  const response = await axiosClient.get(`/legal/handovers/${requestId}/asset-documents/${documentId}/content`, {
-    responseType: 'blob',
-  })
-  return {
-    blob: response.data,
-  }
-}
-
-/**
  * Phê duyệt hồ sơ pháp lý (chỉ khả dụng khi status là Pending_Legal)
  * @param {number|string} requestId
  * @param {{ comment: string }} input

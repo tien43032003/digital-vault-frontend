@@ -1,6 +1,7 @@
 import axiosClient from './axiosClient'
 import {
   getAdminRoles,
+  getAdminUsers,
   getIntegrations,
   getKeyRotation,
   getSecurityAlerts,
@@ -19,6 +20,18 @@ vi.mock('./axiosClient', () => ({
 describe('adminApi users', () => {
   afterEach(() => {
     vi.clearAllMocks()
+  })
+
+  it('getAdminUsers_NoFilters_SendsOnlyPaging', async () => {
+    axiosClient.get.mockResolvedValue({ data: { page: 1, pageSize: 20, items: [] } })
+    await getAdminUsers()
+    expect(axiosClient.get).toHaveBeenCalledWith('/admin/users', { params: { page: 1, pageSize: 20 } })
+  })
+
+  it('getAdminUsers_UserIdWithHashAndSpaces_SendsCleanUserId', async () => {
+    axiosClient.get.mockResolvedValue({ data: { items: [] } })
+    await getAdminUsers({ role: 'Owner', status: 'Active', userId: ' #15 ' })
+    expect(axiosClient.get).toHaveBeenCalledWith('/admin/users', { params: { page: 1, pageSize: 20, role: 'Owner', status: 'Active', userId: '15' } })
   })
 
   it('updateAdminUser_Input_PutsTrimmedFieldsAndReturnsUser', async () => {

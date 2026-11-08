@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
@@ -96,6 +96,29 @@ describe('AdminUsersPage list', () => {
     expect(await screen.findByText('Người 2-0')).toBeInTheDocument()
     expect(dataRows()).toHaveLength(2)
     expect(screen.getByText('Trang 2')).toBeInTheDocument()
+  })
+})
+
+describe('AdminUsersPage search by user id', () => {
+  it('rows_Ready_ShowUserIdBesideName', async () => {
+    renderPage()
+    await waitForPage()
+    expect(within(dataRows()[0]).getByText(/^#\d+$/)).toBeInTheDocument()
+  })
+
+  it('userId_TypeId_ShowsOnlyThatUser', async () => {
+    renderPage()
+    await waitForPage()
+    await userEvent.type(screen.getByRole('spinbutton', { name: 'Tìm theo User ID' }), '2')
+    await waitFor(() => expect(dataRows()).toHaveLength(1))
+    expect(dataRows()[0]).toHaveTextContent('#2')
+  })
+
+  it('userId_UnknownId_ShowsEmptyMessage', async () => {
+    renderPage()
+    await waitForPage()
+    await userEvent.type(screen.getByRole('spinbutton', { name: 'Tìm theo User ID' }), '99999')
+    expect(await screen.findByText('Không có người dùng phù hợp.')).toBeInTheDocument()
   })
 })
 

@@ -8,7 +8,6 @@ import LegalHandoverListPage from './LegalHandoverListPage'
 vi.mock('../../callapi/legalApi', () => ({
   getLegalHandover: vi.fn(),
   getLegalHandovers: vi.fn(),
-  downloadLegalAssetDocument: vi.fn(),
   downloadLegalHandoverDocument: vi.fn(),
   approveLegalHandover: vi.fn(),
   rejectLegalHandover: vi.fn(),
