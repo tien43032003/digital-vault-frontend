@@ -17,6 +17,7 @@ import AppToast from '../../components/common/AppToast'
 import DocumentUploadForm from '../../components/executor/DocumentUploadForm'
 import HandoverIntakePanel from '../../components/executor/HandoverIntakePanel'
 import HandoverStatusBadge from '../../components/executor/HandoverStatusBadge'
+import HandoverChatPanel from '../../components/handover/HandoverChatPanel'
 import LegalVerificationForm from '../../components/executor/LegalVerificationForm'
 import { useHandover } from '../../hooks/useHandover'
 import { useVaultName } from '../../hooks/useVaultName'
@@ -24,6 +25,7 @@ import { MOCK_MODE } from '../../mocks/mode'
 import { formatAllocation } from '../../utils/catalog'
 import { downloadBlob } from '../../utils/download'
 import { handoverOwnerName, vaultLabel } from '../../utils/executor'
+import { canShowChat } from '../../utils/chat'
 import { handoverActionErrorMessage, handoverCode, isEditableStatus } from '../../utils/handover'
 import { formatDateTime } from '../../utils/proofOfLife'
 
@@ -335,6 +337,8 @@ export default function ExecutorHandoverDetailPage({ mockMode = MOCK_MODE }) {
           <strong>Hồ sơ đã bị hủy</strong> — không thể chỉnh sửa thêm.
         </p>
       )}
+
+      {canShowChat(handover.status) && <HandoverChatPanel requestId={handover.requestId} counterpart="người thẩm định" />}
 
       <AppToast show={Boolean(toast)} onClose={closeToast} title={toast?.title} detail={toast?.detail} />
     </div>
