@@ -1,4 +1,5 @@
 // Tiện ích cho cổng Người thụ hưởng: trạng thái hồ sơ, thông báo lỗi tiếng Việt, phiên xác thực OTP
+import { validateHandoverDocument } from './validators'
 
 const GENERIC_ERROR = 'Đã có lỗi xảy ra, vui lòng thử lại.'
 
@@ -78,7 +79,11 @@ export function otpVerifyError(error) {
 
 export function receiptErrorMessage(error) {
     if (error?.status === 409) return 'Hồ sơ chưa ở trạng thái cho phép xác nhận hoặc bạn đã xác nhận trước đó.'
+    if (error?.status === 400 && /signature|certificate|chữ ký/i.test(error?.message ?? '')) {
+        return 'Chữ ký số không hợp lệ, chứng thư chưa được tin cậy/đã hết hạn hoặc không khớp với file biên bản. Vui lòng kiểm tra lại.'
+    }
     if (error?.status === 400) return `Thông tin xác nhận không hợp lệ.${error?.message ? ` ${error.message}` : ''}`
+    if (error?.status === 413) return 'File tải lên quá lớn.'
     if (error?.status === 404) return 'Không tìm thấy hồ sơ bàn giao.'
     if (error?.status === 403) return 'Bạn không có quyền xác nhận hồ sơ này.'
     return error?.message || GENERIC_ERROR
@@ -86,8 +91,9 @@ export function receiptErrorMessage(error) {
 
 export const RECEIPT_NOTE_LIMIT = 1000
 
-export function validateReceipt({ note, accepted }) {
-    const errors = {}
+// BE bắt buộc đính kèm biên bản xác nhận (File) và chữ ký số rời (Signature) khi người thụ hưởng xác nhận nhận tài sản
+export function validateReceipt({ note, accepted, file, signature }) {
+    const errors = validateHandoverDocument({ file, signature }, { signatureRequired: true })
     if ((note ?? '').trim().length > RECEIPT_NOTE_LIMIT) errors.note = `Ghi chú tối đa ${RECEIPT_NOTE_LIMIT} ký tự.`
     if (!accepted) errors.accepted = 'Vui lòng xác nhận bạn đã nhận đầy đủ tài sản.'
     return errors

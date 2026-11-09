@@ -24,7 +24,7 @@ function ReceiptSection({ handover, receipt, assetName, onConfirmed }) {
     return (
       <>
         <p className="mb-0 fs-13 text-slate-600">
-          Người thi hành đã hoàn tất bàn giao và nộp biên bản có chữ ký số. Hãy kiểm tra giấy tờ rồi xác nhận để hệ thống cấp biên nhận số.
+          Người thi hành đã hoàn tất bàn giao và nộp biên bản có chữ ký số. Hãy kiểm tra giấy tờ, sau đó đính kèm biên bản xác nhận cùng chữ ký số của bạn để nhận biên nhận số.
         </p>
         <ReceiptConfirmForm handoverId={handover.handoverId} onConfirmed={onConfirmed} />
       </>
