@@ -66,7 +66,7 @@ export default function LegalVerificationForm({ requestId, onSubmit }) {
           Gửi thẩm định pháp lý
         </h2>
         <p className="mb-0 fs-12 text-slate-500">
-          Cần nộp giấy chứng tử trước. Người xác minh phải độc lập với bạn, chủ kho và người thụ hưởng.
+          Giấy chứng tử không bắt buộc. Người xác minh phải độc lập với bạn, chủ kho và người thụ hưởng.
         </p>
       </div>
       <form onSubmit={handleSubmit} noValidate className="d-flex flex-column gap-3">

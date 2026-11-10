@@ -217,7 +217,10 @@ describe('ExecutorOrdersPage handover table', () => {
     renderPage()
     await waitForPage()
     const table = await screen.findByRole('table', { name: 'Danh sách hồ sơ bàn giao' })
-    const links = within(table).getAllByRole('link').map((link) => link.textContent)
+    const links = within(table)
+      .getAllByRole('link')
+      .map((link) => link.textContent)
+      .filter((text) => text.startsWith('HS-'))
     expect(links).toEqual([handoverCode(second), handoverCode(first)])
   })
 

@@ -47,11 +47,25 @@ export const isEditableStatus = (status) => ['Draft', 'Rejected', 'Additional_In
 
 // Nhóm trạng thái cho từng mục trên thanh điều hướng của Executor
 export const HANDOVER_GROUPS = {
-  pending: ['Pending_Legal', 'Additional_Info'],
+  // Rejected: hồ sơ bị Pháp lý từ chối / yêu cầu bổ sung, Executor cần nộp thêm và gửi thẩm định lại
+  pending: ['Pending_Legal', 'Additional_Info', 'Rejected'],
   approved: ['Approved'],
   inProgress: ['In_Progress'],
   history: ['Completed', 'Cancelled', 'Declined'],
 }
+
+// Bước tiếp theo của Executor cho từng trạng thái hồ sơ, hiện thành nút ở bảng hồ sơ:
+// kind "start" gọi API bắt đầu bàn giao ngay tại bảng, "link" mở trang chi tiết để làm tiếp (nộp giấy tờ, gửi thẩm định, hoàn tất...)
+const EXECUTOR_NEXT_ACTIONS = {
+  Pending_Executor: { label: 'Xem và tiếp nhận', kind: 'link' },
+  Draft: { label: 'Tiếp tục hồ sơ', kind: 'link' },
+  Pending_Legal: { label: 'Theo dõi thẩm định', kind: 'link' },
+  Additional_Info: { label: 'Bổ sung và gửi lại', kind: 'link', primary: true },
+  Rejected: { label: 'Bổ sung và gửi lại', kind: 'link', primary: true },
+  Approved: { label: 'Bắt đầu bàn giao', kind: 'start', primary: true },
+  In_Progress: { label: 'Hoàn tất bàn giao', kind: 'link', primary: true },
+}
+export const executorNextAction = (status) => EXECUTOR_NEXT_ACTIONS[status] ?? { label: 'Xem hồ sơ', kind: 'link' }
 
 // Lọc theo nhóm trạng thái (không truyền thì lấy tất cả), mới nhất trước
 export function filterHandovers(handovers, statuses) {
@@ -109,7 +123,7 @@ export function handoverActionErrorMessage(error, action) {
   }
   if (action === 'legal') {
     if (status === 400) {
-      return `Không gửi được hồ sơ. Hãy kiểm tra đã nộp giấy chứng tử, bằng chứng hợp lệ và người xác minh độc lập (không phải bạn, chủ kho hay người thụ hưởng).${SERVER_DETAIL(error)}`
+      return `Không gửi được hồ sơ. Hãy kiểm tra bằng chứng và chữ ký hợp lệ, cùng người xác minh độc lập (không phải bạn, chủ kho hay người thụ hưởng).${SERVER_DETAIL(error)}`
     }
     if (status === 409) return 'Hồ sơ không ở trạng thái cho phép gửi thẩm định.'
   }

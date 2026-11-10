@@ -254,14 +254,22 @@ describe('legal verification form', () => {
     expect(screen.queryByRole('region', { name: 'Gửi thẩm định pháp lý' })).not.toBeInTheDocument()
   })
 
-  it('submit_MissingDeathCertificate400_ExplainsWhatToCheck', async () => {
-    requestLegalVerification.mockRejectedValue(new ApiError(400, 'A death certificate must be uploaded before legal submission.'))
+  it('submit_Server400_ExplainsWhatToCheckWithoutRequiringDeathCertificate', async () => {
+    requestLegalVerification.mockRejectedValue(new ApiError(400, 'An independent legal verifier is required.'))
     const user = setupUser()
     await openDetail()
     const form = await fill(user)
     const alert = await within(form).findByRole('alert')
-    expect(alert).toHaveTextContent('giấy chứng tử')
-    expect(alert).toHaveTextContent('A death certificate must be uploaded before legal submission.')
+    expect(alert).toHaveTextContent('bằng chứng và chữ ký hợp lệ')
+    expect(alert).not.toHaveTextContent('đã nộp giấy chứng tử')
+    expect(alert).toHaveTextContent('An independent legal verifier is required.')
+  })
+
+  it('forms_DeathCertificateIsOptional_ShownAsNotRequired', async () => {
+    await openDetail()
+    expect(region('Nộp giấy chứng tử')).toHaveTextContent('Không bắt buộc')
+    expect(region('Gửi thẩm định pháp lý')).toHaveTextContent('Giấy chứng tử không bắt buộc')
+    expect(region('Gửi thẩm định pháp lý')).not.toHaveTextContent('Cần nộp giấy chứng tử trước')
   })
 })
 

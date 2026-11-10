@@ -58,7 +58,7 @@ export default function OwnerStatusCard({ status, certificateName = null, onDown
                 </button>
               </span>
             ) : (
-              'Chưa có giấy chứng tử'
+              'Không có giấy chứng tử (không bắt buộc)'
             )}
           </Field>
         </div>

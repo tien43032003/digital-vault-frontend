@@ -99,7 +99,7 @@ function App() {
                 element={
                   <ExecutorHandoverListPage
                     title="Hồ sơ chờ thẩm định"
-                    description="Hồ sơ đã gửi cho người xác minh pháp lý hoặc cần bổ sung tài liệu."
+                    description="Hồ sơ đã gửi cho người xác minh pháp lý, hoặc bị từ chối / cần bổ sung tài liệu để gửi thẩm định lại."
                     statuses={HANDOVER_GROUPS.pending}
                     emptyMessage="Không có hồ sơ nào đang chờ thẩm định."
                   />

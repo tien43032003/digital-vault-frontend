@@ -47,7 +47,7 @@ export default function ExecutorLegalModal({ executor, assetCount, onClose }) {
             Điều kiện mở khóa tài sản
           </h3>
           <ul className="mb-0 fs-13 text-slate-600" style={{ lineHeight: 1.7 }}>
-            <li>Executor nộp giấy chứng tử của bạn và được người xác minh pháp lý thông qua.</li>
+            <li>Executor gửi hồ sơ kèm bằng chứng (giấy chứng tử nếu có) và được người xác minh pháp lý thông qua.</li>
             <li>Bạn luôn có toàn quyền thu hồi hoặc thay thế Executor trước khi bàn giao được kích hoạt.</li>
           </ul>
         </div>

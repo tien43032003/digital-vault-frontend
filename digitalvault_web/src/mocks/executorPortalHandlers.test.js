@@ -179,10 +179,11 @@ describe('mock death certificate and evidence', () => {
 })
 
 describe('mock legal verification request', () => {
-  it('post_WithoutDeathCertificate_Returns400', async () => {
+  it('post_WithoutDeathCertificate_IsAllowedAndMovesToPendingLegal', async () => {
     const request = await createHandover(1)
-    const result = await attempt(() => requestLegalVerification(request.requestId, { verifierId: VERIFIER.userId, evidence: pdf() }))
-    expect(result.status).toBe(400)
+    const result = await attempt(() => requestLegalVerification(request.requestId, { verifierId: VERIFIER.userId, evidence: pdf(), signature: sig() }))
+    expect(result.ok).toBe(true)
+    expect((await getHandover(request.requestId)).status).toBe('Pending_Legal')
   })
 
   it('post_WithDeathCertificate_ReturnsVerificationIdAndMovesToPendingLegal', async () => {
