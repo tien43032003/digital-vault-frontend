@@ -421,24 +421,34 @@ describe('validateHandoverDocument', () => {
 
 describe('validateLegalRequest', () => {
   const evidence = { name: 'BangChung.pdf', type: 'application/pdf', size: 1024 }
+  const signature = { name: 'BangChung.sig', size: 256 }
 
   it('validateLegalRequest_Valid_ReturnsEmptyObject', () => {
-    expect(validateLegalRequest({ verifierId: '6', comment: 'ok', evidence })).toEqual({})
+    expect(validateLegalRequest({ verifierId: '6', comment: 'ok', evidence, signature })).toEqual({})
   })
 
   it('validateLegalRequest_Empty_ReturnsRequiredErrors', () => {
-    expect(validateLegalRequest({ verifierId: '', comment: '', evidence: null })).toEqual({
+    expect(validateLegalRequest({ verifierId: '', comment: '', evidence: null, signature: null })).toEqual({
       verifierId: 'Vui lòng chọn người xác minh pháp lý.',
       evidence: 'Vui lòng chọn file giấy tờ.',
+      signature: 'Vui lòng chọn file chữ ký rời.',
     })
   })
 
   it.each([['0'], ['-3'], ['1.5'], ['abc']])('validateLegalRequest_InvalidVerifierId_ReturnsError', (verifierId) => {
-    expect(validateLegalRequest({ verifierId, comment: '', evidence })).toEqual({ verifierId: 'ID người xác minh phải là số nguyên dương.' })
+    expect(validateLegalRequest({ verifierId, comment: '', evidence, signature })).toEqual({ verifierId: 'ID người xác minh phải là số nguyên dương.' })
   })
 
   it('validateLegalRequest_CommentOver2000_ReturnsError', () => {
-    expect(validateLegalRequest({ verifierId: '6', comment: 'x'.repeat(2001), evidence })).toEqual({ comment: 'Ghi chú tối đa 2000 ký tự.' })
+    expect(validateLegalRequest({ verifierId: '6', comment: 'x'.repeat(2001), evidence, signature })).toEqual({ comment: 'Ghi chú tối đa 2000 ký tự.' })
+  })
+
+  it('validateLegalRequest_MissingSignature_ReturnsRequiredError', () => {
+    expect(validateLegalRequest({ verifierId: '6', comment: '', evidence, signature: null })).toEqual({ signature: 'Vui lòng chọn file chữ ký rời.' })
+  })
+
+  it.each([[0], [16385]])('validateLegalRequest_SignatureSize%s_ReturnsSizeError', (size) => {
+    expect(validateLegalRequest({ verifierId: '6', comment: '', evidence, signature: { name: 'x.sig', size } })).toEqual({ signature: 'File chữ ký phải từ 1 byte đến 16 KB.' })
   })
 })
 

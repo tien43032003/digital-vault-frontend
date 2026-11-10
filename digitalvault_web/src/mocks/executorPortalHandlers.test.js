@@ -193,6 +193,21 @@ describe('mock legal verification request', () => {
     expect((await getHandover(request.requestId)).status).toBe('Pending_Legal')
   })
 
+  it('post_EvidenceWithSignature_IsAccepted', async () => {
+    const request = await createHandover(1)
+    await uploadDeathCertificate(request.requestId, { file: pdf() })
+    const result = await requestLegalVerification(request.requestId, { verifierId: VERIFIER.userId, evidence: pdf('BangChung.pdf'), signature: sig() })
+    expect(typeof result.verificationId).toBe('number')
+  })
+
+  it('post_EvidenceSignatureTooLarge_Returns400', async () => {
+    const request = await createHandover(1)
+    await uploadDeathCertificate(request.requestId, { file: pdf() })
+    const big = new File([new Uint8Array(16385)], 'big.sig')
+    const result = await attempt(() => requestLegalVerification(request.requestId, { verifierId: VERIFIER.userId, evidence: pdf('BangChung.pdf'), signature: big }))
+    expect(result.status).toBe(400)
+  })
+
   it('post_SubmittingTwice_Returns409', async () => {
     const requestId = await submitted()
     const result = await attempt(() => requestLegalVerification(requestId, { verifierId: VERIFIER.userId, evidence: pdf() }))

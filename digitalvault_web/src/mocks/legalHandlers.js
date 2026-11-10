@@ -38,6 +38,17 @@ const handoverDto = (h) => ({
   })),
 })
 
+// Duyệt/Từ chối của BE là multipart/form-data: File, Signature (bắt buộc) và Comment
+async function readDecision(request) {
+  try {
+    const form = await request.formData()
+    const isFile = (value) => value !== null && typeof value === 'object' && typeof value.size === 'number'
+    return { comment: String(form.get('Comment') ?? '').trim(), hasFile: isFile(form.get('File')), hasSignature: isFile(form.get('Signature')) }
+  } catch {
+    return null
+  }
+}
+
 export const legalHandlers = [
   // Danh sách hồ sơ thẩm định pháp lý
   http.get('*/api/legal/handovers', ({ request }) => {
@@ -109,8 +120,10 @@ export const legalHandlers = [
   // Duyệt hồ sơ pháp lý
   http.post('*/api/legal/handovers/:requestId/approve', async ({ request, params }) => {
     const requestId = Number(params.requestId)
-    const body = await request.json().catch(() => ({}))
-    const comment = body?.comment?.trim()
+    const decision = await readDecision(request)
+    if (!decision) return problem(400, 'Request must be multipart/form-data.')
+    if (!decision.hasFile || !decision.hasSignature) return problem(400, 'File and Signature are required.')
+    const comment = decision.comment
 
     if (!comment || isBlank(comment)) {
       return problem(400, 'Ý kiến thẩm định không được để trống.')
@@ -144,8 +157,10 @@ export const legalHandlers = [
   // Từ chối hồ sơ pháp lý
   http.post('*/api/legal/handovers/:requestId/reject', async ({ request, params }) => {
     const requestId = Number(params.requestId)
-    const body = await request.json().catch(() => ({}))
-    const comment = body?.comment?.trim()
+    const decision = await readDecision(request)
+    if (!decision) return problem(400, 'Request must be multipart/form-data.')
+    if (!decision.hasFile || !decision.hasSignature) return problem(400, 'File and Signature are required.')
+    const comment = decision.comment
 
     if (!comment || isBlank(comment)) {
       return problem(400, 'Lý do từ chối không được để trống.')

@@ -136,6 +136,27 @@ export async function deleteInactivePlans() {
   return data
 }
 
+// Thống kê bán gói trong một tháng (month dạng "yyyy-MM"): { month, totalSold, totalRevenue, items: [{ planId, planName, soldCount, revenue, activeUsers }] }
+export async function getPlanMonthlyStats(month = '') {
+  const params = month ? { month } : undefined
+  const { data } = await axiosClient.get('/admin/subscription-plans/stats', { params })
+  return data
+}
+
+// Thống kê toàn thời gian của từng gói (mảng): người đang dùng, đã đặt trước, đã hết hạn, tổng người đăng ký, tổng doanh thu
+export async function getPlanStatistics() {
+  const { data } = await axiosClient.get('/admin/subscription-plans/statistics')
+  return Array.isArray(data) ? data : (data?.items ?? [])
+}
+
+// Người dùng của một gói kèm ngày bắt đầu và hết hạn (PageDto { page, pageSize, total, items }); status rỗng thì không lọc
+export async function getPlanSubscribers(planId, { page = 1, pageSize = 20, status = '' } = {}) {
+  const params = { page, pageSize }
+  if (status) params.status = status
+  const { data } = await axiosClient.get(`/admin/subscription-plans/${planId}/subscribers`, { params })
+  return data
+}
+
 // Giao dịch thanh toán của mọi người dùng (PageDto { page, pageSize, total, items }); status/userId rỗng thì không lọc
 export async function getPaymentTransactions({ page = 1, pageSize = 20, status = '', userId = '' } = {}) {
   const params = { page, pageSize }

@@ -152,6 +152,28 @@ describe('OwnerHandoverDetailPage Executor information', () => {
     expect(await screen.findByText('Người thi hành: LS. Lê Hoàng Nam')).toBeInTheDocument()
   })
 
+  it('documents_BackendSendsSubmitAt_ShowsSubmittedTimeBesideEachFile', async () => {
+    const id = await seedHandover()
+    server.use(
+      http.get('*/api/owner/handovers/:requestId', ({ params }) => {
+        const found = getDb().handovers.find((item) => item.requestId === Number(params.requestId))
+        return HttpResponse.json({
+          ...found,
+          requestType: 'Inheritance',
+          documents: [
+            { documentId: 1, fileName: 'giay_chung_tu.pdf', fileType: 'application/pdf', isEncrypted: true, submitAt: '2026-11-10T13:03:48' },
+            { documentId: 2, fileName: 'cu.pdf', fileType: 'application/pdf', isEncrypted: true },
+          ],
+        })
+      }),
+    )
+    renderPage(id)
+    await waitForPage()
+    const withTime = (await screen.findByText('giay_chung_tu.pdf')).closest('li')
+    expect(withTime).toHaveTextContent('Nộp lúc')
+    expect(screen.getByText('cu.pdf').closest('li')).not.toHaveTextContent('Nộp lúc')
+  })
+
   it('executor_DetailLookupFails_FallsBackToIdLabel', async () => {
     const id = await seedHandover()
     // BE cũ chưa trả executorName và tra chi tiết Executor cũng không được

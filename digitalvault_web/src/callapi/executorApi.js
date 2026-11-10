@@ -58,13 +58,14 @@ export async function getLegalVerifiers(requestId) {
   return Array.isArray(data) ? data : (data?.items ?? [])
 }
 
-// Gửi hồ sơ cho người xác minh pháp lý: VerifierId, Comment (tuỳ chọn), Evidence
-export async function requestLegalVerification(requestId, { verifierId, comment, evidence }) {
+// Gửi hồ sơ cho người xác minh pháp lý: VerifierId, Comment (tuỳ chọn), Evidence và Signature (chữ ký rời của bằng chứng; form FE bắt buộc chọn)
+export async function requestLegalVerification(requestId, { verifierId, comment, evidence, signature }) {
   const form = new FormData()
   form.append('VerifierId', String(verifierId))
   const trimmed = comment?.trim()
   if (trimmed) form.append('Comment', trimmed)
   form.append('Evidence', evidence)
+  if (signature) form.append('Signature', signature)
   const { data } = await axiosClient.post(`/executor/handovers/${requestId}/legal-verifications`, form)
   return data
 }

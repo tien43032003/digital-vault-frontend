@@ -16,6 +16,25 @@ export async function getLegalHandovers({ page = 1, pageSize = 20, status = '' }
   return data
 }
 
+/**
+ * Hồ sơ thuộc nhiều trạng thái gộp thành một danh sách (mới nhất trước), phân trang phía FE.
+ * BE lọc `status` theo trạng thái hiện tại của hồ sơ nên hồ sơ đã được duyệt rồi chuyển sang In_Progress/Completed
+ * không còn nằm trong `Approved`; tab "Đã duyệt" gọi từng trạng thái rồi gộp. Một trạng thái lỗi bị bỏ qua, lỗi hết mới báo lỗi.
+ * @param {{ page?: number, pageSize?: number, statuses: string[] }} params
+ * @returns {Promise<{ page: number, pageSize: number, items: Array }>}
+ */
+export async function getLegalHandoversByStatuses({ page = 1, pageSize = 20, statuses = [] } = {}) {
+  const results = await Promise.allSettled(statuses.map((status) => getAllPages('/legal/handovers', { status })))
+  const failed = results.filter((result) => result.status === 'rejected')
+  if (statuses.length > 0 && failed.length === statuses.length) throw failed[0].reason
+  const byId = new Map()
+  for (const result of results) {
+    if (result.status === 'fulfilled') for (const item of result.value) byId.set(item.requestId, item)
+  }
+  const items = [...byId.values()].sort((a, b) => new Date(b.initiatedAt) - new Date(a.initiatedAt) || b.requestId - a.requestId)
+  return { page, pageSize, items: items.slice((page - 1) * pageSize, page * pageSize) }
+}
+
 // Các phần phụ của trang chi tiết (tài sản, lịch sử, tình trạng chủ kho): lỗi hoặc rỗng chỉ làm phần đó trống, không làm hỏng cả trang
 const orFallback = (promise, fallback) => promise.then((value) => value ?? fallback, () => fallback)
 
@@ -87,28 +106,34 @@ export async function downloadLegalHandoverDocument(requestId, documentId) {
 }
 
 /**
- * Phê duyệt hồ sơ pháp lý (chỉ khả dụng khi status là Pending_Legal)
+ * Phê duyệt hồ sơ pháp lý (chỉ khả dụng khi status là Pending_Legal), kèm tệp quyết định và chữ ký số rời .sig
  * @param {number|string} requestId
- * @param {{ comment: string }} input
+ * @param {{ comment: string, file: File, signature: File }} input
  * @returns {Promise<{ verificationId: number, requestId: number, verifierId: number, status: string, comment: string, submittedAt: string, reviewedAt: string }>}
  */
-export async function approveLegalHandover(requestId, { comment }) {
-  const trimmed = comment?.trim() ?? ''
-  const { data } = await axiosClient.post(`/legal/handovers/${requestId}/approve`, {
-    comment: trimmed,
+export async function approveLegalHandover(requestId, { comment, file, signature }) {
+  const formData = new FormData()
+  formData.append('File', file)
+  formData.append('Signature', signature)
+  formData.append('Comment', comment?.trim() ?? '')
+  const { data } = await axiosClient.post(`/legal/handovers/${requestId}/approve`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
   })
   return data
 }
 
 /**
- * Từ chối hồ sơ pháp lý
+ * Từ chối hồ sơ pháp lý, kèm tệp quyết định từ chối và chữ ký số rời .sig
  * @param {number|string} requestId
- * @param {{ comment: string }} input
+ * @param {{ comment: string, file: File, signature: File }} input
  */
-export async function rejectLegalHandover(requestId, { comment }) {
-  const trimmed = comment?.trim() ?? ''
-  const { data } = await axiosClient.post(`/legal/handovers/${requestId}/reject`, {
-    comment: trimmed,
+export async function rejectLegalHandover(requestId, { comment, file, signature }) {
+  const formData = new FormData()
+  formData.append('File', file)
+  formData.append('Signature', signature)
+  formData.append('Comment', comment?.trim() ?? '')
+  const { data } = await axiosClient.post(`/legal/handovers/${requestId}/reject`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
   })
   return data
 }

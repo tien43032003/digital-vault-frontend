@@ -9,7 +9,7 @@ import CancelHandoverModal from '../../components/owner/CancelHandoverModal'
 import { useOwnerHandoverDetail } from '../../hooks/useOwnerHandoverDetail'
 import { MOCK_MODE } from '../../mocks/mode'
 import { vaultLabel } from '../../utils/executor'
-import { handoverCode, isCancellableStatus } from '../../utils/handover'
+import { documentSubmittedLabel, handoverCode, isCancellableStatus } from '../../utils/handover'
 import { formatDateTime } from '../../utils/proofOfLife'
 
 const CASE_STATUS_LABELS = { Pending: 'Chờ bàn giao', In_Progress: 'Đang chuyển giao', Completed: 'Đã bàn giao', Received: 'Đã nhận', Cancelled: 'Đã hủy' }
@@ -155,6 +155,7 @@ export default function OwnerHandoverDetailPage({ mockMode = MOCK_MODE }) {
                 <FileText size={16} className="text-slate-400" aria-hidden="true" />
                 <span className="fw-medium text-ink">{document.fileName}</span>
                 <span className="text-slate-500">{document.fileType}</span>
+                {documentSubmittedLabel(document) && <span className="text-slate-500">{`· ${documentSubmittedLabel(document)}`}</span>}
               </li>
             ))}
           </ul>

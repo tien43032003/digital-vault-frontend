@@ -81,6 +81,13 @@ describe('executorApi', () => {
     expect(form.get('Evidence').name).toBe('ChungTu.pdf')
   })
 
+  it('requestLegalVerification_WithSignature_PostsSignatureField', async () => {
+    axiosClient.post.mockResolvedValue({ data: {} })
+    const signature = new File([new Uint8Array(64)], 'BangChung.sig')
+    await requestLegalVerification(7, { verifierId: 6, evidence: file, signature })
+    expect(sentForm().get('Signature').name).toBe('BangChung.sig')
+  })
+
   it('requestLegalVerification_BlankComment_OmitsComment', async () => {
     axiosClient.post.mockResolvedValue({ data: {} })
     await requestLegalVerification(7, { verifierId: 6, comment: '   ', evidence: file })

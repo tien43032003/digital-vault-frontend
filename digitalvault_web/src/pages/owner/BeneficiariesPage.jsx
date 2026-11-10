@@ -28,9 +28,9 @@ function StatBox({ label, icon: Icon, tone, children }) {
 // Các hộp thoại sửa/gỡ chỉ làm việc với phân bổ đang hiệu lực, bỏ phân bổ chờ xác nhận
 const onlyActive = (person) => ({ ...person, items: person.items.filter((item) => item.status !== 'Pending') })
 
-// Trang "Người thụ hưởng": gom theo từng người, tìm kiếm và chỉ định thêm người thụ hưởng
+// Trang "Người thụ hưởng": gom theo từng người, lọc theo kho, tìm kiếm và chỉ định thêm người thụ hưởng
 export default function BeneficiariesPage() {
-  const { status, error, assets, beneficiaries, reload } = useOwnerCatalog()
+  const { status, error, vaults, assets, beneficiaries, assetsLoading, selectedVault, selectVault, reload } = useOwnerCatalog()
   const [query, setQuery] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [action, setAction] = useState(null)
@@ -113,8 +113,37 @@ export default function BeneficiariesPage() {
       </div>
 
       <section className="av-panel d-flex flex-column gap-3" aria-label="Danh sách người thụ hưởng">
-        {people.length === 0 ? (
-          <p className="av-empty mb-0">Bạn chưa có người thụ hưởng nào.</p>
+        {/* Người thụ hưởng gắn với tài sản nên lọc theo kho: chọn kho nào thì chỉ thấy người được hưởng tài sản của kho đó */}
+        {vaults.length > 1 && (
+          <div className="d-flex flex-wrap align-items-center gap-2">
+            <label htmlFor="beneficiary-vault-filter" className="av-label mb-0">
+              Kho
+            </label>
+            <Form.Select
+              id="beneficiary-vault-filter"
+              aria-label="Lọc người thụ hưởng theo kho"
+              value={selectedVault?.vaultId ?? ''}
+              onChange={(event) => {
+                setQuery('')
+                selectVault(Number(event.target.value))
+              }}
+              style={{ maxWidth: 360 }}
+            >
+              {vaults.map((vault) => (
+                <option key={vault.vaultId} value={vault.vaultId}>
+                  {vault.name}
+                </option>
+              ))}
+            </Form.Select>
+          </div>
+        )}
+        {assetsLoading ? (
+          <p role="status" className="d-flex align-items-center gap-3 fs-14 text-slate-500 mb-0">
+            <span className="spinner-border spinner-border-sm text-brand" aria-hidden="true" />
+            Đang tải người thụ hưởng của kho...
+          </p>
+        ) : people.length === 0 ? (
+          <p className="av-empty mb-0">{vaults.length > 1 ? 'Kho này chưa có người thụ hưởng nào.' : 'Bạn chưa có người thụ hưởng nào.'}</p>
         ) : (
           <>
             <div className="av-search">

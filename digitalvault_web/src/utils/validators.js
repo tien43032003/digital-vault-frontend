@@ -154,8 +154,8 @@ export function validateHandoverDocument({ file, signature }, { signatureRequire
   return errors
 }
 
-// Validate form gửi thẩm định pháp lý: người xác minh (ID), ghi chú tuỳ chọn tối đa 2000 ký tự, file bằng chứng
-export function validateLegalRequest({ verifierId, comment, evidence }) {
+// Validate form gửi thẩm định pháp lý: người xác minh (ID), ghi chú tuỳ chọn tối đa 2000 ký tự, file bằng chứng và chữ ký rời (.sig, bắt buộc)
+export function validateLegalRequest({ verifierId, comment, evidence, signature }) {
   const errors = {}
   const id = String(verifierId ?? '').trim()
   if (!id) errors.verifierId = 'Vui lòng chọn người xác minh pháp lý.'
@@ -165,6 +165,9 @@ export function validateLegalRequest({ verifierId, comment, evidence }) {
 
   const evidenceError = validateDocumentFile(evidence, 'Vui lòng chọn file giấy tờ.')
   if (evidenceError) errors.evidence = evidenceError
+
+  if (!signature) errors.signature = 'Vui lòng chọn file chữ ký rời.'
+  else if (signature.size <= 0 || signature.size > UPLOAD_LIMITS.maxSignatureBytes) errors.signature = 'File chữ ký phải từ 1 byte đến 16 KB.'
   return errors
 }
 

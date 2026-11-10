@@ -5,10 +5,10 @@ import { validateLegalRequest } from '../../utils/validators'
 import FileField from '../common/FileField'
 import TextField from '../common/TextField'
 
-const EMPTY = { verifierId: '', comment: '', evidence: null }
+const EMPTY = { verifierId: '', comment: '', evidence: null, signature: null }
 
 // Form gửi hồ sơ cho người xác minh pháp lý. Danh sách người xác minh do BE trả theo hồ sơ (đã loại người xung đột lợi ích).
-// onSubmit nhận { verifierId, comment, evidence }; lỗi ném ra đã là thông báo tiếng Việt.
+// onSubmit nhận { verifierId, comment, evidence, signature }; lỗi ném ra đã là thông báo tiếng Việt.
 export default function LegalVerificationForm({ requestId, onSubmit }) {
   const [form, setForm] = useState(EMPTY)
   const [errors, setErrors] = useState({})
@@ -50,7 +50,7 @@ export default function LegalVerificationForm({ requestId, onSubmit }) {
 
     setBusy(true)
     try {
-      await onSubmit({ verifierId: Number(form.verifierId), comment: form.comment, evidence: form.evidence })
+      await onSubmit({ verifierId: Number(form.verifierId), comment: form.comment, evidence: form.evidence, signature: form.signature })
     } catch (error) {
       setSubmitError(error.message)
       setBusy(false)
@@ -132,6 +132,15 @@ export default function LegalVerificationForm({ requestId, onSubmit }) {
           file={form.evidence}
           error={errors.evidence}
           onChange={(file) => setField('evidence', file)}
+        />
+        <FileField
+          id="legal-signature"
+          label="Chữ ký số rời"
+          hint="File chữ ký RSA-SHA256 dạng nhị phân (.sig), tối đa 16 KB."
+          required
+          file={form.signature}
+          error={errors.signature}
+          onChange={(file) => setField('signature', file)}
         />
         {submitError && <Alert variant="danger" className="av-alert mb-0">{submitError}</Alert>}
         <div>

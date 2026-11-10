@@ -1,6 +1,7 @@
 import { parseQuotaError, quotaMessage } from './quota'
 
 import { parseServerDate } from './beneficiary'
+import { formatDateTime } from './proofOfLife'
 
 // Trạng thái hồ sơ bàn giao (HANDOVER_REQUESTS của BE) và tông màu hiển thị
 const STATUS_INFO = {
@@ -127,4 +128,13 @@ export function handoverActionErrorMessage(error, action) {
     if (status === 409) return 'Hồ sơ chưa đủ điều kiện để hoàn tất (cần được duyệt pháp lý).'
   }
   return error?.message || 'Đã có lỗi xảy ra, vui lòng thử lại.'
+}
+
+// Thời điểm giấy tờ được nộp vào hồ sơ (BE trả submitAt trong DocumentDto; chấp nhận cả submittedAt), null nếu BE chưa trả
+export const documentSubmittedAt = (document) => document?.submitAt ?? document?.submittedAt ?? null
+
+// "Nộp lúc 10/11/2026 20:03" để phân biệt giấy tờ nộp ở các lần khác nhau; chuỗi rỗng khi chưa có thời điểm
+export function documentSubmittedLabel(document) {
+  const submittedAt = documentSubmittedAt(document)
+  return submittedAt ? `Nộp lúc ${formatDateTime(submittedAt)}` : ''
 }

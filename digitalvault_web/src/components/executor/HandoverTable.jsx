@@ -39,6 +39,11 @@ export default function HandoverTable({ handovers, vaultNames = new Map() }) {
               <td>{`${item.documents.length} giấy tờ`}</td>
               <td>
                 <HandoverStatusBadge status={item.status} />
+                {(item.status === 'Rejected' || item.status === 'Additional_Info') && item.legalComment && (
+                  <div className="mt-1 fs-12 text-danger" style={{ maxWidth: 260 }}>
+                    <strong>Lý do pháp lý:</strong> {item.legalComment}
+                  </div>
+                )}
               </td>
             </tr>
           ))}

@@ -160,6 +160,60 @@ describe('BeneficiariesPage list', () => {
   })
 })
 
+describe('BeneficiariesPage vault filter', () => {
+  // Kho thứ hai có một tài sản và đúng một người thụ hưởng (Quân) để thấy rõ khác biệt giữa hai kho
+  function seedSecondVault() {
+    const db = getDb()
+    const vaultId = nextId('vault')
+    db.vaults.push({ vaultId, ownerId: db.vaults[0].ownerId, name: 'Kho gia đình thứ hai', description: null, status: 'Active' })
+    const assetId = nextId('asset')
+    db.assets.push({ assetId, vaultId, name: 'Sổ tiết kiệm kho hai', type: 'BankAccount', description: null, status: 'Active', documents: [] })
+    const quan = db.users.find((item) => item.email === 'quan.le@example.com')
+    db.assignments.push({ assignmentId: nextId('assignment'), assetId, beneficiaryId: quan.userId, allocation: 100, status: 'Active' })
+    saveDb()
+    return { vaultId, assetId }
+  }
+  const filter = () => screen.getByRole('combobox', { name: 'Lọc người thụ hưởng theo kho' })
+
+  it('filter_OnlyOneVault_IsHidden', async () => {
+    renderPage()
+    await waitForPage()
+    expect(screen.queryByRole('combobox', { name: 'Lọc người thụ hưởng theo kho' })).not.toBeInTheDocument()
+  })
+
+  it('filter_SeveralVaults_ListsEachVaultAndStartsWithTheFirst', async () => {
+    seedSecondVault()
+    renderPage()
+    await waitForPage()
+    const options = within(filter()).getAllByRole('option')
+    expect(options.map((option) => option.textContent)).toEqual(['Kho Tài Sản Số & Phân Quyền Thừa Kế Cá Nhân', 'Kho gia đình thứ hai'])
+    expect(screen.getAllByRole('article')).toHaveLength(2)
+  })
+
+  it('filter_ChooseOtherVault_ShowsOnlyThatVaultsBeneficiaries', async () => {
+    const { vaultId } = seedSecondVault()
+    renderPage()
+    await waitForPage()
+    await userEvent.selectOptions(filter(), String(vaultId))
+    const card = await screen.findByRole('article', { name: 'Lê Minh Quân' })
+    expect(card).toHaveTextContent('Sổ tiết kiệm kho hai')
+    expect(screen.getAllByRole('article')).toHaveLength(1)
+    expect(screen.getByRole('group', { name: 'NGƯỜI THỤ HƯỞNG' })).toHaveTextContent('01')
+  })
+
+  it('filter_VaultWithoutBeneficiaries_ShowsEmptyMessageAndKeepsFilter', async () => {
+    const db = getDb()
+    const vaultId = nextId('vault')
+    db.vaults.push({ vaultId, ownerId: db.vaults[0].ownerId, name: 'Kho trống', description: null, status: 'Active' })
+    saveDb()
+    renderPage()
+    await waitForPage()
+    await userEvent.selectOptions(filter(), String(vaultId))
+    expect(await screen.findByText('Kho này chưa có người thụ hưởng nào.')).toBeInTheDocument()
+    expect(filter()).toBeInTheDocument()
+  })
+})
+
 describe('BeneficiariesPage without data', () => {
   it('render_NewOwnerWithoutAssets_ShowsEmptyStateAndDisabledAdd', async () => {
     await register({ fullName: 'Chủ Mới', email: 'moi@example.com', phone: '', password: 'Registration123!', confirmPassword: 'Registration123!' })
