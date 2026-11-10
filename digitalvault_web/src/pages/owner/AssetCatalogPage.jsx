@@ -19,7 +19,7 @@ import { useAdminResource } from '../../hooks/useAdminResource'
 import { useOwnerCatalog } from '../../hooks/useOwnerCatalog'
 import { useVaultExecutor } from '../../hooks/useVaultExecutor'
 import { buildStats, filterAssets, getTypeTabs, paginate } from '../../utils/catalog'
-import { isVaultLockedByHandover } from '../../utils/handover'
+import { isOwnerLockedByHandover, isVaultLockedByHandover } from '../../utils/handover'
 
 const DEFAULT_PAGE_SIZE = 4
 
@@ -139,6 +139,9 @@ export default function AssetCatalogPage() {
     )
   }
 
+  const lockedByHandover = isVaultLockedByHandover(handovers, selectedVault.vaultId)
+  const ownerLockedByHandover = isOwnerLockedByHandover(handovers)
+
   return (
     <div className="d-flex flex-column gap-4">
       <VaultBanner
@@ -150,7 +153,8 @@ export default function AssetCatalogPage() {
         onEditVault={() => setModal('editVault')}
         onCloseVault={() => setModal('closeVault')}
         onCheckIn={() => navigate('/owner/proof-of-life?ping=1')}
-        lockedByHandover={isVaultLockedByHandover(handovers, selectedVault.vaultId)}
+        lockedByHandover={lockedByHandover}
+        ownerLockedByHandover={ownerLockedByHandover}
       />
       <StatCards stats={stats} executor={executor} />
 
@@ -173,7 +177,13 @@ export default function AssetCatalogPage() {
         ) : assets.length === 0 ? (
           <div className="av-empty">
             <p className="mb-3">Kho này chưa có tài sản nào.</p>
-            <Button type="button" variant="primary" className="av-btn av-btn-sm" onClick={() => setModal('asset')}>
+            <Button
+              type="button"
+              variant="primary"
+              className="av-btn av-btn-sm"
+              disabled={lockedByHandover || ownerLockedByHandover || selectedVault.status !== 'Active'}
+              onClick={() => setModal('asset')}
+            >
               Thêm tài sản đầu tiên
             </Button>
           </div>

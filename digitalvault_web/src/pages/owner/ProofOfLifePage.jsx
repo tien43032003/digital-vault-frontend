@@ -25,9 +25,9 @@ function StatBox({ label, children }) {
   )
 }
 
-function ProofOfLifeContent({ data, apply, mockMode, autoPing }) {
+function ProofOfLifeContent({ data, lockedByHandover = false, apply, mockMode, autoPing }) {
   const [ping, setPing] = useState({ busy: false, error: null })
-  const [pingOpen, setPingOpen] = useState(Boolean(autoPing))
+  const [pingOpen, setPingOpen] = useState(Boolean(autoPing && !lockedByHandover))
   const [toast, setToast] = useState(null)
   const closeToast = useCallback(() => setToast(null), [])
 
@@ -64,11 +64,17 @@ function ProofOfLifeContent({ data, apply, mockMode, autoPing }) {
             <p className="mt-1 mb-0 fs-12 text-slate-500">Định kỳ xác nhận bạn vẫn còn sống để Người thi hành và người xác minh pháp lý nắm được tình trạng của bạn.</p>
           </div>
         </div>
-        <Button type="button" variant="primary" className="av-btn av-btn-sm" onClick={() => setPingOpen(true)}>
+        <Button type="button" variant="primary" className="av-btn av-btn-sm" disabled={lockedByHandover} onClick={() => setPingOpen(true)}>
           <HeartPulse size={16} aria-hidden="true" />
           Tôi vẫn còn sống
         </Button>
       </section>
+
+      {lockedByHandover && (
+        <Alert variant="warning" className="av-alert mb-0">
+          Tài khoản đang có hồ sơ bàn giao đính kèm giấy chứng tử nên chức năng điểm danh sự sống đã bị khóa. Vui lòng liên hệ Người thi hành để xử lý hồ sơ.
+        </Alert>
+      )}
 
       <MockNotice mode={mockMode === 'full' ? mockMode : 'off'} />
 
@@ -108,7 +114,7 @@ function ProofOfLifeContent({ data, apply, mockMode, autoPing }) {
 
 // Trang "Điểm danh sự sống": xem lần xác nhận còn sống gần nhất và bấm xác nhận
 export default function ProofOfLifePage({ mockMode = MOCK_MODE }) {
-  const { status, data, error, reload, apply } = useProofOfLife()
+  const { status, data, lockedByHandover, error, reload, apply } = useProofOfLife()
   const [searchParams] = useSearchParams()
 
   if (status === 'loading') {
@@ -131,5 +137,5 @@ export default function ProofOfLifePage({ mockMode = MOCK_MODE }) {
     )
   }
 
-  return <ProofOfLifeContent data={data} apply={apply} mockMode={mockMode} autoPing={searchParams.get('ping') === '1'} />
+  return <ProofOfLifeContent data={data} lockedByHandover={lockedByHandover} apply={apply} mockMode={mockMode} autoPing={searchParams.get('ping') === '1'} />
 }

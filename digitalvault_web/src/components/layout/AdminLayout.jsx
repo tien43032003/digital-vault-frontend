@@ -1,4 +1,4 @@
-import { CreditCard, History, KeyRound, LayoutDashboard, LogOut, Plug, ShieldCheck, SlidersHorizontal, Users, Workflow } from 'lucide-react'
+import { CalendarClock, CreditCard, History, KeyRound, LayoutDashboard, LogOut, Plug, ShieldCheck, SlidersHorizontal, Users, Workflow } from 'lucide-react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import BrandLogo from '../common/BrandLogo'
@@ -14,6 +14,7 @@ const ADMIN_ITEMS = [
 
 const BILLING_ITEMS = [
   { label: 'Gói dịch vụ & Thanh toán', icon: CreditCard, to: '/admin/plans' },
+  { label: 'Đăng ký gói của người dùng', icon: CalendarClock, to: '/admin/subscriptions' },
   { label: 'Nhật ký kiểm toán hệ thống', icon: History, to: '/admin/audit-logs' },
   { label: 'Trạng thái tích hợp dịch vụ', icon: Plug, to: '/admin/integrations' },
   { label: 'Cấu hình tham số', icon: SlidersHorizontal, to: '/admin/settings' },

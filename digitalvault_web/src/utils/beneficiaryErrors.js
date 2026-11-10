@@ -10,6 +10,7 @@ export function assignErrorMessage(error) {
       return 'Người này đã được chỉ định cho tài sản (đang chờ xác nhận hoặc đã hiệu lực). Hãy chờ họ xác nhận hoặc chọn người khác.'
     }
     if (/cannot exceed/i.test(detail)) return 'Tổng tỷ lệ của những người thụ hưởng đang hiệu lực không được vượt 100%.'
+    if (/giấy chứng tử|báo tử|deceased/i.test(detail)) return detail
     return conflictMessage(detail)
   }
   return error?.message || 'Đã có lỗi xảy ra, vui lòng thử lại.'

@@ -106,6 +106,24 @@ describe('RegisterModal', () => {
     expect(onSuccess).not.toHaveBeenCalled()
   })
 
+  it('submit_DuplicatePhone_ShowsPhoneFieldError', async () => {
+    authApi.register.mockRejectedValue(new ApiError(409, 'Số điện thoại này đã được đăng ký bởi một chủ sở hữu khác.', 'PHONE_ALREADY_EXISTS'))
+    const { onSuccess } = renderModal()
+    await fillValidForm()
+    await submit()
+    expect(await screen.findByText('Số điện thoại này đã được đăng ký bởi một chủ sở hữu khác.')).toBeInTheDocument()
+    expect(onSuccess).not.toHaveBeenCalled()
+  })
+
+  it('submit_DuplicateIdentityNumber_ShowsIdentityNumberFieldError', async () => {
+    authApi.register.mockRejectedValue(new ApiError(409, 'Số CCCD này đã được đăng ký bởi một chủ sở hữu khác.', 'IDENTITY_NUMBER_ALREADY_EXISTS'))
+    const { onSuccess } = renderModal()
+    await fillValidForm()
+    await submit()
+    expect(await screen.findByText('Số CCCD này đã được đăng ký bởi một chủ sở hữu khác.')).toBeInTheDocument()
+    expect(onSuccess).not.toHaveBeenCalled()
+  })
+
   it('submit_TooManyRequests_ShowsAlert', async () => {
     authApi.register.mockRejectedValue(new ApiError(429, ''))
     renderModal()

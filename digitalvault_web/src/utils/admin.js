@@ -20,8 +20,28 @@ const USER_STATUS_INFO = {
 export const USER_STATUSES = Object.keys(USER_STATUS_INFO)
 export const userStatusInfo = (status) => USER_STATUS_INFO[status] ?? { text: status, tone: 'muted' }
 
+// Tách lỗi 400/409 từ BE về đúng trường đang gặp ngoại lệ (email, phone, identityNumber)
+export function extractUserFieldError(error) {
+  if (error?.status !== 409 && error?.status !== 400) return null
+  const code = error?.code || ''
+  const msg = error?.message || ''
+  const lower = msg.toLowerCase()
+
+  if (code === 'PHONE_ALREADY_EXISTS' || code === 'INVALID_PHONE' || lower.includes('điện thoại') || lower.includes('phone')) {
+    return { field: 'phone', message: msg || 'Số điện thoại này đã được đăng ký.' }
+  }
+  if (code === 'IDENTITY_NUMBER_ALREADY_EXISTS' || code === 'INVALID_IDENTITY_NUMBER' || lower.includes('cccd') || lower.includes('identity')) {
+    return { field: 'identityNumber', message: msg || 'Số CCCD này đã được đăng ký.' }
+  }
+  if (code === 'EMAIL_ALREADY_EXISTS' || code === 'INVALID_EMAIL' || lower.includes('email')) {
+    return { field: 'email', message: msg || 'Email này đã được sử dụng.' }
+  }
+  return null
+}
+
 // Thông báo lỗi chung cho các thao tác quản trị người dùng
 export function adminErrorMessage(error) {
+  if (error?.message && error.message !== 'Đã có lỗi xảy ra, vui lòng thử lại.') return error.message
   if (error?.status === 400) return 'Thông tin không hợp lệ. Vui lòng kiểm tra lại.'
   if (error?.status === 403) return 'Bạn không có quyền Quản trị hệ thống.'
   if (error?.status === 404) return 'Không tìm thấy người dùng. Vui lòng tải lại danh sách.'

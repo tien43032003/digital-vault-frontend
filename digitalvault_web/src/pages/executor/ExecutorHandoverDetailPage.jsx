@@ -243,7 +243,11 @@ export default function ExecutorHandoverDetailPage({ mockMode = MOCK_MODE }) {
           <DocumentUploadForm
             idPrefix="death-certificate"
             title="Nộp giấy chứng tử"
-            description="Bắt buộc trước khi gửi thẩm định pháp lý. Chỉ Người thi hành được phân công mới nộp được."
+            description={
+              handover.requestType === 'DeadManSwitch'
+                ? 'Bắt buộc trước khi gửi thẩm định pháp lý đối với hồ sơ kích hoạt do quá hạn điểm danh.'
+                : 'Chỉ bắt buộc khi hồ sơ kích hoạt do quá hạn điểm danh. Hồ sơ do Chủ sở hữu chủ động tạo không bắt buộc nộp giấy chứng tử.'
+            }
             fileLabel="Giấy chứng tử"
             submitLabel="Nộp giấy chứng tử"
             onSubmit={submitFile(uploadDeathCertificate, 'Đã nộp giấy chứng tử')}

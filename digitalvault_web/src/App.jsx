@@ -30,6 +30,7 @@ import VnpayReturnPage from './pages/payment/VnpayReturnPage'
 import { MOCK_MODE } from './mocks/mode'
 import AdminRolesPage from './pages/admin/AdminRolesPage'
 import AdminSettingsPage from './pages/admin/AdminSettingsPage'
+import AdminSubscriptionsPage from './pages/admin/AdminSubscriptionsPage'
 import AdminUsersPage from './pages/admin/AdminUsersPage'
 import BeneficiariesPage from './pages/owner/BeneficiariesPage'
 import ExecutorManagementPage from './pages/owner/ExecutorManagementPage'
@@ -223,6 +224,7 @@ function App() {
               <Route path="hsm" element={<AdminEncryptionPage />} />
               <Route path="handovers" element={<AdminHandoversPage />} />
               <Route path="plans" element={<AdminPlansPage />} />
+            <Route path="subscriptions" element={<AdminSubscriptionsPage />} />
               <Route path="audit-logs" element={<AdminAuditLogsPage />} />
               <Route path="integrations" element={<AdminIntegrationsPage />} />
               <Route path="settings" element={<AdminSettingsPage />} />

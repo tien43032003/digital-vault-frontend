@@ -149,3 +149,14 @@ export async function getPaymentTransaction(transactionId) {
   const { data } = await axiosClient.get(`/admin/payment-transactions/${transactionId}`)
   return data
 }
+
+// Danh sách đăng ký gói của mọi người dùng (Admin): mỗi dòng gồm người dùng, gói, trạng thái (Active | Scheduled | Expired), ngày bắt đầu và ngày hết hạn
+// status lọc theo trạng thái; expiringInDays chỉ lấy gói còn tối đa N ngày; search tìm theo email
+export async function getAdminUserSubscriptions({ page = 1, pageSize = 20, status = '', expiringInDays, search = '' } = {}) {
+  const params = { page, pageSize }
+  if (status) params.status = status
+  if (expiringInDays) params.expiringInDays = expiringInDays
+  if (search) params.search = search
+  const { data } = await axiosClient.get('/admin/user-subscriptions', { params })
+  return data
+}
