@@ -12,7 +12,9 @@ export async function getAllPages(path, params = {}) {
     if (Array.isArray(data)) return data
     const pageItems = data?.items ?? []
     items.push(...pageItems)
-    if (pageItems.length < PAGE_SIZE) break
+    // BE có thể tự giới hạn pageSize (vd. tối đa 50): so với pageSize BE trả về để không dừng sớm và bỏ sót dữ liệu cũ
+    const effectiveSize = Number(data?.pageSize) > 0 ? Math.min(Number(data.pageSize), PAGE_SIZE) : PAGE_SIZE
+    if (pageItems.length === 0 || pageItems.length < effectiveSize) break
   }
   return items
 }

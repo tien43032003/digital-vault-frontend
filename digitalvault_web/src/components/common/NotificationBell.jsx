@@ -9,6 +9,7 @@ import {
   markNotificationsRead,
 } from '../../callapi/notificationApi'
 import { formatRelativeTime } from '../../utils/beneficiary'
+import { describeNotification } from '../../utils/notifications'
 
 const PANEL_LIMIT = 8
 const PUSH_HIDE_MS = 6000
@@ -94,6 +95,7 @@ export default function NotificationBell({ inboxPath, pollMs = 30000 }) {
 
   const unread = items.filter((item) => !item.isRead)
   const unreadLabel = unread.length > 99 ? '99+' : String(unread.length)
+  const pushInfo = push ? describeNotification(push.item) : null
 
   const markOne = async (item) => {
     if (item.isRead || busyId !== null) return
@@ -167,7 +169,9 @@ export default function NotificationBell({ inboxPath, pollMs = 30000 }) {
                 <p className="mb-0">Chưa có thông báo nào.</p>
               </div>
             )}
-            {items.slice(0, PANEL_LIMIT).map((item) => (
+            {items.slice(0, PANEL_LIMIT).map((item) => {
+              const info = describeNotification(item)
+              return (
               <button
                 key={item.notificationId}
                 type="button"
@@ -178,13 +182,14 @@ export default function NotificationBell({ inboxPath, pollMs = 30000 }) {
               >
                 <span className="av-mailbox-item-icon">{item.isRead ? <MailOpen size={14} aria-hidden="true" /> : <BellRing size={14} aria-hidden="true" />}</span>
                 <span className="av-mailbox-item-main">
-                  <span className="d-block fs-13 fw-semibold text-ink text-truncate">{item.title || 'Thông báo hệ thống'}</span>
-                  {item.message && <span className="av-mailbox-item-msg">{item.message}</span>}
+                  <span className="d-block fs-13 fw-semibold text-ink text-truncate">{info.title}</span>
+                  {info.body && <span className="av-mailbox-item-msg">{info.body}</span>}
                   <span className="d-block fs-11 text-slate-400 mt-1">{formatRelativeTime(item.createdAt)}</span>
                 </span>
                 {!item.isRead && <span className="av-unread-dot" aria-label="Chưa đọc" />}
               </button>
-            ))}
+              )
+            })}
           </div>
 
           {inboxPath && (
@@ -203,8 +208,8 @@ export default function NotificationBell({ inboxPath, pollMs = 30000 }) {
             </span>
             <div className="flex-grow-1" style={{ minWidth: 0 }}>
               <p className="mb-0 av-mono-tag fs-10">THÔNG BÁO MỚI</p>
-              <p className="mb-0 fw-bold text-ink fs-13 text-truncate">{push.item.title || 'Thông báo hệ thống'}</p>
-              {push.item.message && <p className="mb-0 fs-12 text-slate-500 av-clamp-2">{push.item.message}</p>}
+              <p className="mb-0 fw-bold text-ink fs-13 text-truncate">{pushInfo.title}</p>
+              {pushInfo.body && <p className="mb-0 fs-12 text-slate-500 av-clamp-2">{pushInfo.body}</p>}
               {push.extra > 0 && <p className="mb-0 mt-1 fs-11 text-brand fw-semibold">{`+${push.extra} thông báo khác`}</p>}
             </div>
             <button type="button" onClick={() => setPush(null)} aria-label="Đóng thông báo" className="av-icon-btn">

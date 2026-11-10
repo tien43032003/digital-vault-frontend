@@ -1,30 +1,87 @@
 import { declineReasonFromNotifications } from './handover'
 
-// Các thông báo BE gửi cho Owner (tiêu đề tiếng Anh cố định) và cách hiển thị tiếng Việt; tiêu đề lạ giữ nguyên để không mất thông tin
+// Các thông báo BE gửi cho mọi cổng (tiêu đề tiếng Anh cố định) và cách hiển thị tiếng Việt.
+// body(ctx) dựng nội dung tiếng Việt từ các chi tiết trích được trong nội dung gốc (mã hồ sơ, tên trong ngoặc, tỉ lệ %).
+// Tiêu đề lạ giữ nguyên để không mất thông tin.
+const ref = (ctx) => (ctx.requestId !== null ? ` #${ctx.requestId}` : '')
+const named = (ctx) => (ctx.name ? ` "${ctx.name}"` : '')
+
 const KNOWN = {
-  'Executor accepted handover': { title: 'Executor đã tiếp nhận hồ sơ bàn giao', tone: 'ok' },
+  'Executor accepted handover': { title: 'Executor đã tiếp nhận hồ sơ bàn giao', tone: 'ok', body: () => 'Executor được giao đã tiếp nhận hồ sơ bàn giao của bạn.' },
   'Executor declined handover': { title: 'Executor đã từ chối hồ sơ bàn giao', tone: 'warn' },
-  'Vault assignment revoked': { title: 'Phân công Executor đã bị thu hồi', tone: 'warn' },
-  'Vault assigned': { title: 'Kho được giao cho Executor', tone: 'info' },
+  'Vault assignment revoked': { title: 'Phân công Executor đã bị thu hồi', tone: 'warn', body: () => 'Phân công Executor của bạn với kho này đã bị thu hồi.' },
+  'Vault assigned': { title: 'Bạn được giao làm người thi hành kho', tone: 'info', body: (ctx) => `Chủ sở hữu đã chỉ định bạn làm người thi hành cho kho${named(ctx)}.` },
+  'Beneficiary designated': {
+    title: 'Bạn được chỉ định là người thụ hưởng',
+    tone: 'info',
+    body: (ctx) => `Bạn đã được chỉ định là người thụ hưởng${ctx.name ? ` của tài sản "${ctx.name}"` : ''}${ctx.percent ? ` với tỉ lệ phân bổ ${ctx.percent}` : ''}.`,
+  },
+  'Allocation changed': {
+    title: 'Tỉ lệ phân bổ di sản đã thay đổi',
+    tone: 'warn',
+    body: (ctx) => `Tỉ lệ phân bổ của bạn${ctx.name ? ` đối với tài sản "${ctx.name}"` : ''} đã được cập nhật${ctx.percent ? ` thành ${ctx.percent}` : ''}.`,
+  },
+  'Handover assigned': { title: 'Có hồ sơ bàn giao mới được giao', tone: 'info', body: (ctx) => `Hồ sơ bàn giao${ref(ctx)} đã được giao cho bạn xử lý.` },
+  'Legal review assigned': { title: 'Có hồ sơ mới cần thẩm định pháp lý', tone: 'info', body: (ctx) => `Hồ sơ${ref(ctx)} đã được gửi đến bạn để thẩm định pháp lý.` },
+  'Legal review updated': { title: 'Kết quả thẩm định pháp lý đã cập nhật', tone: 'info', body: (ctx) => `Kết quả thẩm định pháp lý của hồ sơ${ref(ctx)} vừa được cập nhật${ctx.status ? `: ${ctx.status}` : ''}.` },
+  'Inheritance available': { title: 'Di sản đã sẵn sàng cho bạn', tone: 'ok', body: (ctx) => `Tài sản${named(ctx)} đã sẵn sàng để bàn giao cho bạn. Hãy theo dõi tiến trình bàn giao.` },
+  'Handover completed': { title: 'Hồ sơ bàn giao đã hoàn tất', tone: 'ok', body: (ctx) => `Người thi hành đã hoàn tất bàn giao hồ sơ${ref(ctx)}. Vui lòng kiểm tra và xác nhận đã nhận tài sản.` },
+  'Receipt confirmed': { title: 'Đã xác nhận nhận tài sản', tone: 'ok', body: (ctx) => `Người thụ hưởng đã xác nhận nhận tài sản của hồ sơ${ref(ctx)} và biên nhận số đã được cấp.` },
 }
 
-const HANDOVER_NUMBER = /Handover #(\d+)/
+// Loại thông báo (trường type của BE) hiển thị tiếng Việt
+const TYPE_LABELS = {
+  Handover: 'Bàn giao',
+  Assignment: 'Phân công',
+  Beneficiary: 'Thụ hưởng',
+  Allocation: 'Phân bổ',
+  Inheritance: 'Di sản',
+  Legal: 'Pháp lý',
+  LegalReview: 'Thẩm định pháp lý',
+  Receipt: 'Biên nhận',
+  Payment: 'Thanh toán',
+  ProofOfLife: 'Xác minh còn sống',
+  Security: 'Bảo mật',
+  System: 'Hệ thống',
+}
+
+export function notificationTypeLabel(type) {
+  if (!type) return ''
+  return TYPE_LABELS[type] ?? TYPE_LABELS[String(type).replace(/[\s_-]/g, '')] ?? type
+}
+
+const HANDOVER_NUMBER = /Handover #(\d+)/i
+const QUOTED_NAME = /["'“‘]([^"'”’]{1,120})["'”’]/
+const PERCENT = /(\d+(?:[.,]\d+)?)\s*%/
+const REVIEW_STATUS = { approved: 'Đã duyệt', rejected: 'Bị từ chối', 'needs info': 'Cần bổ sung', 'needs_info': 'Cần bổ sung', 'more info': 'Cần bổ sung' }
+
+// Thay các cụm tiếng Anh phổ biến trong nội dung lạ để vẫn đọc được bằng tiếng Việt
+const vietnamizeMessage = (message) => message.replace(/Handover #(\d+)/gi, 'Hồ sơ #$1')
 
 // Chuẩn hóa một thông báo: tiêu đề và nội dung tiếng Việt, tông màu, mã hồ sơ liên quan (nếu có) để tạo liên kết
 export function describeNotification(notification) {
-  const rawTitle = notification.title ?? ''
-  const message = notification.message ?? ''
+  const rawTitle = (notification?.title ?? '').trim()
+  const message = notification?.message ?? ''
   const known = KNOWN[rawTitle]
-  const requestId = HANDOVER_NUMBER.exec(message)?.[1] ?? null
-  const base = { requestId: requestId === null ? null : Number(requestId), tone: known?.tone ?? 'info' }
+  const found = HANDOVER_NUMBER.exec(message) ?? HANDOVER_NUMBER.exec(rawTitle)
+  const base = { requestId: found ? Number(found[1]) : null, tone: known?.tone ?? 'info', typeLabel: notificationTypeLabel(notification?.type) }
 
-  if (rawTitle === 'Executor declined handover' && base.requestId !== null) {
+  if (rawTitle === 'Executor declined handover') {
+    if (base.requestId === null) return { ...base, title: known.title, body: vietnamizeMessage(message) }
     const reason = declineReasonFromNotifications([notification], base.requestId)
     return { ...base, title: known.title, body: reason ? `Hồ sơ #${base.requestId} bị từ chối. Lý do: ${reason}` : `Hồ sơ #${base.requestId} bị từ chối.` }
   }
-  if (rawTitle === 'Executor accepted handover') return { ...base, title: known.title, body: 'Executor được giao đã tiếp nhận hồ sơ bàn giao của bạn.' }
-  if (rawTitle === 'Vault assignment revoked') return { ...base, title: known.title, body: 'Phân công Executor của bạn với kho này đã bị thu hồi.' }
-  return { ...base, title: known?.title ?? (rawTitle || 'Thông báo'), body: message }
+  if (known?.body) {
+    const statusKey = Object.keys(REVIEW_STATUS).find((key) => message.toLowerCase().includes(key))
+    const ctx = {
+      requestId: base.requestId,
+      name: QUOTED_NAME.exec(message)?.[1]?.trim() ?? null,
+      percent: PERCENT.exec(message) ? `${PERCENT.exec(message)[1]}%` : null,
+      status: statusKey ? REVIEW_STATUS[statusKey] : null,
+    }
+    return { ...base, title: known.title, body: known.body(ctx) }
+  }
+  return { ...base, title: rawTitle || 'Thông báo', body: vietnamizeMessage(message) }
 }
 
 // Số thông báo chưa đọc hiển thị trên huy hiệu: ẩn khi 0, gộp từ 100 trở lên thành 99+
