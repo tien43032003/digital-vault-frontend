@@ -44,6 +44,7 @@ describe('AdminLayout', () => {
       'Giám sát mã hóa & khóa': '/admin/hsm',
       'Quy trình bàn giao': '/admin/handovers',
       'Gói dịch vụ & Thanh toán': '/admin/plans',
+      'Đăng ký gói của người dùng': '/admin/subscriptions',
       'Nhật ký kiểm toán hệ thống': '/admin/audit-logs',
       'Trạng thái tích hợp dịch vụ': '/admin/integrations',
       'Cấu hình tham số': '/admin/settings',

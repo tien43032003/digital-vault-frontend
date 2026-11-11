@@ -48,7 +48,14 @@ function ProfileSection({ profile, onSaved }) {
       onSaved(await updateProfile(form))
       setSave({ busy: false, error: '' })
     } catch (error) {
-      setSave({ busy: false, error: error?.message || GENERIC_ERROR })
+      const code = error?.code || ''
+      const msg = error?.message || GENERIC_ERROR
+      if (code === 'PHONE_ALREADY_EXISTS' || code === 'INVALID_PHONE' || msg.toLowerCase().includes('điện thoại')) {
+        setErrors((prev) => ({ ...prev, phone: msg }))
+        setSave({ busy: false, error: '' })
+      } else {
+        setSave({ busy: false, error: msg })
+      }
     }
   }
 

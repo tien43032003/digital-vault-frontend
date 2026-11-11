@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { getLifeConfirmation } from '../callapi/ownerApi'
+import { getLifeConfirmation, getOwnerHandovers } from '../callapi/ownerApi'
+import { isOwnerLockedByHandover } from '../utils/handover'
 
-const INITIAL_STATE = { status: 'loading', data: null, error: '' }
+const INITIAL_STATE = { status: 'loading', data: null, lockedByHandover: false, error: '' }
 
 // Lần xác nhận còn sống gần nhất của Owner: data = { ownerId, lastConfirmedAliveAt } (thời gian là null khi chưa xác nhận lần nào).
 // apply nhận kết quả của lần bấm xác nhận để cập nhật ngay không cần tải lại.
@@ -11,12 +12,19 @@ export function useProofOfLife() {
 
   useEffect(() => {
     let cancelled = false
-    getLifeConfirmation()
-      .then((data) => {
-        if (!cancelled) setState({ status: 'ready', data, error: '' })
+    Promise.all([getLifeConfirmation(), getOwnerHandovers().catch(() => [])])
+      .then(([data, handovers]) => {
+        if (!cancelled) {
+          setState({
+            status: 'ready',
+            data,
+            lockedByHandover: isOwnerLockedByHandover(handovers),
+            error: '',
+          })
+        }
       })
       .catch((error) => {
-        if (!cancelled) setState({ status: 'error', data: null, error: error?.message || 'Đã có lỗi xảy ra.' })
+        if (!cancelled) setState({ status: 'error', data: null, lockedByHandover: false, error: error?.message || 'Đã có lỗi xảy ra.' })
       })
     return () => {
       cancelled = true
@@ -28,7 +36,7 @@ export function useProofOfLife() {
     setReloadKey((key) => key + 1)
   }, [])
 
-  const apply = useCallback((data) => setState({ status: 'ready', data, error: '' }), [])
+  const apply = useCallback((data) => setState((prev) => ({ ...prev, status: 'ready', data, error: '' })), [])
 
   return { ...state, reload, apply }
 }

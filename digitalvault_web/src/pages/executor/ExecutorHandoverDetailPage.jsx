@@ -26,7 +26,6 @@ import { formatAllocation } from '../../utils/catalog'
 import { downloadBlob } from '../../utils/download'
 import { handoverOwnerName, vaultLabel } from '../../utils/executor'
 import { canShowChat } from '../../utils/chat'
-import { handoverActionErrorMessage, handoverCode, isEditableStatus } from '../../utils/handover'
 import { documentSubmittedLabel, handoverActionErrorMessage, handoverCode, isEditableStatus } from '../../utils/handover'
 import { formatDateTime } from '../../utils/proofOfLife'
 

@@ -2,7 +2,7 @@ import { UserPlus, X } from 'lucide-react'
 import { useState } from 'react'
 import { Alert, Button, Form, Modal } from 'react-bootstrap'
 import { createAdminUser } from '../../callapi/adminApi'
-import { adminErrorMessage, ALL_ROLES, roleLabel, validateAdminUser } from '../../utils/admin'
+import { adminErrorMessage, ALL_ROLES, extractUserFieldError, roleLabel, validateAdminUser } from '../../utils/admin'
 import TextField from '../common/TextField'
 
 const EMPTY_FORM = { fullName: '', email: '', password: '', phone: '', identityNumber: '', roles: [] }
@@ -45,6 +45,8 @@ export default function CreateUserModal({ onClose, onCreated }) {
       onCreated(user)
     } catch (caught) {
       setBusy(false)
+      const fieldError = extractUserFieldError(caught)
+      if (fieldError) setErrors((prev) => ({ ...prev, [fieldError.field]: fieldError.message }))
       setSubmitError(adminErrorMessage(caught))
     }
   }
