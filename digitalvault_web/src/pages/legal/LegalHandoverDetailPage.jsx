@@ -26,7 +26,7 @@ import { canShowChat } from '../../utils/chat'
 import { downloadBlob } from '../../utils/download'
 import { assetTypeLabel, formatAllocation } from '../../utils/catalog'
 import { vaultLabel } from '../../utils/executor'
-import { handoverCode, handoverStatusInfo } from '../../utils/handover'
+import { documentSubmittedLabel, handoverCode, handoverStatusInfo } from '../../utils/handover'
 import { formatDateTime } from '../../utils/proofOfLife'
 
 const CASE_STATUS_LABELS = {
@@ -42,6 +42,18 @@ const REVIEW_OUTCOMES = {
   Approved: {
     title: 'Đã duyệt hồ sơ',
     description: 'Hồ sơ đã được phê duyệt pháp lý. Người thi hành có thể bắt đầu bàn giao tài sản cho người thụ hưởng.',
+    icon: CheckCircle2,
+    tone: 'ok',
+  },
+  In_Progress: {
+    title: 'Đã duyệt hồ sơ',
+    description: 'Hồ sơ đã được phê duyệt pháp lý và Người thi hành đang bàn giao tài sản cho người thụ hưởng.',
+    icon: CheckCircle2,
+    tone: 'ok',
+  },
+  Completed: {
+    title: 'Đã duyệt hồ sơ',
+    description: 'Hồ sơ đã được phê duyệt pháp lý và đã hoàn tất bàn giao tài sản.',
     icon: CheckCircle2,
     tone: 'ok',
   },
@@ -243,23 +255,12 @@ export default function LegalHandoverDetailPage() {
                 className="d-flex align-items-center gap-2 fs-13 fw-semibold px-3 py-2"
                 disabled={!isPendingLegal}
                 onClick={() => setReviewModalType('reject')}
-                title={isPendingLegal ? 'Từ chối hồ sơ bàn giao' : 'Chỉ được thẩm định khi hồ sơ ở trạng thái Pending_Legal'}
+                title={isPendingLegal ? 'Từ chối hồ sơ hoặc yêu cầu Người thi hành bổ sung' : 'Chỉ được thẩm định khi hồ sơ ở trạng thái Pending_Legal'}
               >
                 <XCircle size={16} aria-hidden="true" />
-                Từ chối
+                Từ chối / Yêu cầu bổ sung
               </Button>
 
-              <Button
-                type="button"
-                variant="warning"
-                className="d-flex align-items-center gap-2 fs-13 fw-semibold px-3 py-2 text-dark"
-                disabled={!isPendingLegal}
-                onClick={() => setReviewModalType('additional-info')}
-                title={isPendingLegal ? 'Yêu cầu Executor bổ sung thông tin' : 'Chỉ được thẩm định khi hồ sơ ở trạng thái Pending_Legal'}
-              >
-                <AlertCircle size={16} aria-hidden="true" />
-                Yêu cầu bổ sung thông tin
-              </Button>
             </div>
             )}
           </div>
@@ -326,16 +327,19 @@ export default function LegalHandoverDetailPage() {
                         </p>
                         <div className="d-flex align-items-center gap-2 fs-11 text-slate-500 mt-1">
                           {doc.fileType && <span>{doc.fileType}</span>}
+                          {documentSubmittedLabel(doc) && <span>{documentSubmittedLabel(doc)}</span>}
                           {doc.isEncrypted && (
                             <span className="badge bg-light text-secondary border d-inline-flex align-items-center gap-1">
                               <Lock size={10} /> Đã mã hóa
                             </span>
                           )}
-                          {doc.signatureValid !== null && (
-                            <span className={`badge ${doc.signatureValid ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning'}`}>
-                              {doc.signatureValid ? 'Chữ ký hợp lệ' : 'Chữ ký chưa xác thực'}
-                            </span>
-                          )}
+                          {/* Giấy tờ Executor nộp phải có file chữ ký .sig đi kèm và khớp thì mới hợp lệ; thiếu chữ ký hoặc chưa xác thực được đều là không hợp lệ */}
+                          <span
+                            className={`badge ${doc.signatureValid === true ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'}`}
+                            title={doc.signatureValid === true ? 'Có file chữ ký .sig đi kèm và chữ ký khớp với tài liệu' : 'Không có file chữ ký .sig đi kèm hoặc chữ ký không khớp với tài liệu'}
+                          >
+                            {doc.signatureValid === true ? 'Chữ ký hợp lệ' : 'Chữ ký không hợp lệ'}
+                          </span>
                         </div>
                       </div>
                     </div>

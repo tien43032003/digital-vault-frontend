@@ -202,6 +202,16 @@ describe('AssetCatalogPage asset list', () => {
 describe('AssetCatalogPage add asset', () => {
   const openModal = () => userEvent.click(screen.getByRole('button', { name: /Thêm tài sản mới/ }))
 
+  it('addAsset_Form_HasNoExecutorPicker', async () => {
+    renderPage()
+    await waitForCatalog()
+    await openModal()
+    const dialog = screen.getByRole('dialog', { name: 'Thêm Tài Sản Số Mới' })
+    expect(within(dialog).getByLabelText(/Tên tài sản/)).toBeInTheDocument()
+    expect(within(dialog).queryByText(/Người thi hành/)).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: /Xem chi tiết/ })).not.toBeInTheDocument()
+  })
+
   it('addAsset_EmptyForm_ShowsValidationErrors', async () => {
     renderPage()
     await waitForCatalog()

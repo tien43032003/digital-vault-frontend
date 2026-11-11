@@ -48,7 +48,7 @@ describe('OwnerStatusCard', () => {
 
   it('status_NoCertificateAndNoDates_ShowsDashes', () => {
     render(<OwnerStatusCard status={{ fullName: 'A', status: null, lastConfirmedAliveAt: null, verifiedAt: null, deathCertificateDocumentId: null }} />)
-    expect(screen.getByText('Chưa có giấy chứng tử')).toBeInTheDocument()
+    expect(screen.getByText('Không có giấy chứng tử (không bắt buộc)')).toBeInTheDocument()
     expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(3)
     expect(screen.queryByRole('button', { name: /Tải giấy chứng tử/ })).not.toBeInTheDocument()
   })

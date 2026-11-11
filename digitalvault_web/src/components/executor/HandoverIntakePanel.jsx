@@ -15,7 +15,7 @@ export default function HandoverIntakePanel({ requestId, busy, onAccept, onDecli
           Hồ sơ đang chờ bạn tiếp nhận
         </h2>
         <p className="mb-0 fs-13 text-slate-600">
-          Chủ kho đã giao hồ sơ này cho bạn. Chấp nhận để bắt đầu nộp giấy chứng tử và gửi thẩm định; hoặc từ chối kèm lý do nếu không thể đảm nhận. Mỗi hồ sơ chỉ quyết định được một lần.
+          Chủ kho đã giao hồ sơ này cho bạn. Chấp nhận để bắt đầu nộp giấy tờ, bằng chứng và gửi thẩm định; hoặc từ chối kèm lý do nếu không thể đảm nhận. Mỗi hồ sơ chỉ quyết định được một lần.
         </p>
       </div>
       <div className="d-flex flex-wrap gap-2">

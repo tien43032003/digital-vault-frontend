@@ -1,4 +1,6 @@
 // Tiện ích cho cổng Người thụ hưởng: trạng thái hồ sơ, thông báo lỗi tiếng Việt, phiên xác thực OTP
+import { validateHandoverDocument } from './validators'
+
 
 const GENERIC_ERROR = 'Đã có lỗi xảy ra, vui lòng thử lại.'
 
@@ -86,8 +88,10 @@ export function receiptErrorMessage(error) {
 
 export const RECEIPT_NOTE_LIMIT = 1000
 
-export function validateReceipt({ note, accepted }) {
-    const errors = {}
+// BE yêu cầu multipart: File (tệp xác nhận) và Signature (chữ ký số rời) bắt buộc, Note tuỳ chọn
+export function validateReceipt({ note, accepted, file, signature }) {
+    const errors = validateHandoverDocument({ file, signature }, { signatureRequired: true })
+    if (errors.file === 'Vui lòng chọn file giấy tờ.') errors.file = 'Vui lòng chọn tệp xác nhận nhận tài sản.'
     if ((note ?? '').trim().length > RECEIPT_NOTE_LIMIT) errors.note = `Ghi chú tối đa ${RECEIPT_NOTE_LIMIT} ký tự.`
     if (!accepted) errors.accepted = 'Vui lòng xác nhận bạn đã nhận đầy đủ tài sản.'
     return errors

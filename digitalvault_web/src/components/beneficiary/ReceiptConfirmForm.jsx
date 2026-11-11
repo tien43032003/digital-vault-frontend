@@ -3,11 +3,13 @@ import { useState } from 'react'
 import { Alert, Button, Form } from 'react-bootstrap'
 import { confirmHandoverReceipt } from '../../callapi/beneficiaryApi'
 import { RECEIPT_NOTE_LIMIT, receiptErrorMessage, validateReceipt } from '../../utils/beneficiary'
+import FileField from '../common/FileField'
 
-// Form xác nhận đã nhận tài sản: POST /api/beneficiary/handovers/{handoverId}/receipt { note }
+// Form xác nhận đã nhận tài sản: POST /api/beneficiary/handovers/{handoverId}/receipt (multipart: File, Signature bắt buộc, Note tuỳ chọn)
 export default function ReceiptConfirmForm({ handoverId, onConfirmed }) {
   const [note, setNote] = useState('')
   const [accepted, setAccepted] = useState(false)
+  const [files, setFiles] = useState({ file: null, signature: null })
   const [errors, setErrors] = useState({})
   const [alert, setAlert] = useState('')
   const [busy, setBusy] = useState(false)
@@ -15,13 +17,13 @@ export default function ReceiptConfirmForm({ handoverId, onConfirmed }) {
   const handleSubmit = async (event) => {
     event.preventDefault()
     if (busy) return
-    const validation = validateReceipt({ note, accepted })
+    const validation = validateReceipt({ note, accepted, ...files })
     setErrors(validation)
     setAlert('')
     if (Object.keys(validation).length > 0) return
     setBusy(true)
     try {
-      const receipt = await confirmHandoverReceipt(handoverId, note)
+      const receipt = await confirmHandoverReceipt(handoverId, { note, ...files })
       onConfirmed(receipt)
     } catch (caught) {
       setAlert(receiptErrorMessage(caught))
@@ -54,6 +56,32 @@ export default function ReceiptConfirmForm({ handoverId, onConfirmed }) {
         />
         {errors.note && <p className="av-error">{errors.note}</p>}
       </div>
+
+      <FileField
+        id={`receipt-file-${handoverId}`}
+        label="Tệp xác nhận nhận tài sản"
+        hint="PDF, PNG, JPEG hoặc TXT, tối đa 10 MB."
+        accept=".pdf,.png,.jpg,.jpeg,.txt"
+        required
+        file={files.file}
+        error={errors.file}
+        onChange={(file) => {
+          setFiles((current) => ({ ...current, file }))
+          setErrors((current) => ({ ...current, file: undefined }))
+        }}
+      />
+      <FileField
+        id={`receipt-signature-${handoverId}`}
+        label="Chữ ký số rời"
+        hint="File chữ ký RSA-SHA256 dạng nhị phân (.sig), tối đa 16 KB."
+        required
+        file={files.signature}
+        error={errors.signature}
+        onChange={(signature) => {
+          setFiles((current) => ({ ...current, signature }))
+          setErrors((current) => ({ ...current, signature: undefined }))
+        }}
+      />
 
       <label className="av-terms" htmlFor={`receipt-accept-${handoverId}`}>
         <input

@@ -1,13 +1,36 @@
-import { Link } from 'react-router-dom'
+import { useState } from 'react'
+import { Alert, Button } from 'react-bootstrap'
+import { Link, useNavigate } from 'react-router-dom'
+import { startHandover } from '../../callapi/executorApi'
 import { assetNamesOf, handoverOwnerName, vaultLabel } from '../../utils/executor'
-import { handoverCode } from '../../utils/handover'
+import { executorNextAction, handoverActionErrorMessage, handoverCode } from '../../utils/handover'
 import { formatDateTime } from '../../utils/proofOfLife'
 import HandoverStatusBadge from './HandoverStatusBadge'
 
-// Bảng hồ sơ bàn giao của Executor; mỗi dòng dẫn tới trang chi tiết. vaultNames (vaultId -> tên kho) là tuỳ chọn
+// Bảng hồ sơ bàn giao của Executor; mỗi dòng có nút bước tiếp theo theo trạng thái (bắt đầu bàn giao, bổ sung và gửi lại, hoàn tất...).
+// vaultNames (vaultId -> tên kho) là tuỳ chọn
 export default function HandoverTable({ handovers, vaultNames = new Map() }) {
+  const navigate = useNavigate()
+  const [startingId, setStartingId] = useState(null)
+  const [actionError, setActionError] = useState('')
+
+  // Hồ sơ đã được duyệt: bắt đầu bàn giao rồi vào chi tiết để nộp biên bản và hoàn tất
+  const handleStart = async (requestId) => {
+    setStartingId(requestId)
+    setActionError('')
+    try {
+      await startHandover(requestId)
+      navigate(`/executor/handovers/${requestId}`)
+    } catch (caught) {
+      setActionError(handoverActionErrorMessage(caught, 'start'))
+      setStartingId(null)
+    }
+  }
+
   return (
-    <div className="table-responsive">
+    <div className="d-flex flex-column gap-3">
+      {actionError && <Alert variant="danger" className="av-alert mb-0">{actionError}</Alert>}
+      <div className="table-responsive">
       <table className="table align-middle mb-0 fs-13" aria-label="Danh sách hồ sơ bàn giao">
         <thead>
           <tr className="fs-11 text-slate-500">
@@ -17,6 +40,9 @@ export default function HandoverTable({ handovers, vaultNames = new Map() }) {
             <th scope="col">Phạm vi</th>
             <th scope="col">Giấy tờ</th>
             <th scope="col">Trạng thái</th>
+            <th scope="col">
+              <span className="visually-hidden">Thao tác</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -39,11 +65,34 @@ export default function HandoverTable({ handovers, vaultNames = new Map() }) {
               <td>{`${item.documents.length} giấy tờ`}</td>
               <td>
                 <HandoverStatusBadge status={item.status} />
+                {(item.status === 'Rejected' || item.status === 'Additional_Info') && item.legalComment && (
+                  <div className="mt-1 fs-12 text-danger" style={{ maxWidth: 260 }}>
+                    <strong>Lý do pháp lý:</strong> {item.legalComment}
+                  </div>
+                )}
+              </td>
+              <td className="text-end text-nowrap">
+                {(() => {
+                  const next = executorNextAction(item.status)
+                  if (next.kind === 'start') {
+                    return (
+                      <Button type="button" variant="primary" className="av-btn av-btn-sm" disabled={startingId !== null} onClick={() => handleStart(item.requestId)}>
+                        {startingId === item.requestId ? 'Đang xử lý...' : next.label}
+                      </Button>
+                    )
+                  }
+                  return (
+                    <Link to={`/executor/handovers/${item.requestId}`} className={`av-ghost-btn${next.primary ? ' is-brand' : ''}`}>
+                      {next.label}
+                    </Link>
+                  )
+                })()}
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }

@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Alert } from 'react-bootstrap'
 import { downloadBlob } from '../../utils/download'
 import { fileTypeLabel } from '../../utils/catalog'
+import { documentSubmittedLabel } from '../../utils/handover'
 
 // Danh sách giấy tờ (DocumentDto) có nút tải về; download(document) gọi API trả { blob, signatureValid }
 export default function DocumentList({ documents, download, onDownloaded, emptyMessage = 'Chưa có giấy tờ nào.', label = 'Giấy tờ' }) {
@@ -39,6 +40,7 @@ export default function DocumentList({ documents, download, onDownloaded, emptyM
               <div className="av-doc-main">
                 <p className="mb-0 fs-13 fw-semibold text-ink text-truncate">{document.fileName || `Tài liệu #${document.documentId}`}</p>
                 <p className="mb-0 fs-11 text-slate-500 font-mono">{fileTypeLabel(document.fileType)}</p>
+                {documentSubmittedLabel(document) && <p className="mb-0 fs-11 text-slate-500">{documentSubmittedLabel(document)}</p>}
               </div>
               {document.isEncrypted && (
                 <span className="av-badge av-badge-ok">

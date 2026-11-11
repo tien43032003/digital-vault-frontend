@@ -48,6 +48,7 @@ import BeneficiaryNotificationsPage from './pages/beneficiary/BeneficiaryNotific
 import LegalHandoverListPage from './pages/legal/LegalHandoverListPage'
 import LegalHandoverDetailPage from './pages/legal/LegalHandoverDetailPage'
 import LegalNotificationsPage from './pages/legal/LegalNotificationsPage'
+import ExecutorNotificationsPage from './pages/executor/ExecutorNotificationsPage'
 
 // Component gốc: khai báo provider và các route theo từng vai trò của hệ thống
 function App() {
@@ -98,7 +99,7 @@ function App() {
                 element={
                   <ExecutorHandoverListPage
                     title="Hồ sơ chờ thẩm định"
-                    description="Hồ sơ đã gửi cho người xác minh pháp lý hoặc cần bổ sung tài liệu."
+                    description="Hồ sơ đã gửi cho người xác minh pháp lý, hoặc bị từ chối / cần bổ sung tài liệu để gửi thẩm định lại."
                     statuses={HANDOVER_GROUPS.pending}
                     emptyMessage="Không có hồ sơ nào đang chờ thẩm định."
                   />
@@ -137,7 +138,7 @@ function App() {
                   />
                 }
               />
-              <Route path="mailbox" element={<RolePlaceholderPage title="Hộp thư bảo mật E2EE" />} />
+              <Route path="mailbox" element={<ExecutorNotificationsPage />} />
               <Route path="certificates" element={<RolePlaceholderPage title="Chứng thư số & SmartCA" />} />
             </Route>
           </Route>
@@ -162,8 +163,8 @@ function App() {
                 element={
                   <LegalHandoverListPage
                     title="Hồ sơ đã duyệt & Ký số"
-                    description="Danh sách các hồ sơ bàn giao đã được pháp lý phê duyệt và sẵn sàng bàn giao."
-                    status="Approved"
+                    description="Danh sách các hồ sơ bàn giao đã được pháp lý phê duyệt, kể cả hồ sơ đang bàn giao hoặc đã hoàn tất."
+                    statuses={['Approved', 'In_Progress', 'Completed']}
                     emptyMessage="Chưa có hồ sơ nào đã được phê duyệt."
                   />
                 }

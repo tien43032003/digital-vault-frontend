@@ -1,9 +1,10 @@
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { login } from '../../callapi/authApi'
 import { createHandover } from '../../callapi/executorApi'
+import { createPendingRequest } from '../../test/pendingRequest'
 import { handoverCode } from '../../utils/handover'
 import { DEMO_ACCOUNT, ROLE_ACCOUNTS, getDb, resetMockDb } from '../../mocks/db'
 import { handlers } from '../../mocks/handlers'
@@ -115,6 +116,81 @@ describe('ExecutorOrdersPage assignments', () => {
   })
 })
 
+describe('ExecutorOrdersPage accept / decline pending handover', () => {
+  // Hồ sơ do chủ kho giao như thật: kho đủ giấy tờ, 100% phân bổ, Pending_Executor (rồi đăng nhập lại bằng Executor)
+  const pendingRequest = () => createPendingRequest()
+  const section = () => screen.getByRole('region', { name: 'Kho được phân công' })
+
+  it('pending_Handover_ShowsAcceptAndDeclineButtonsNotCreate', async () => {
+    const request = await pendingRequest()
+    renderPage()
+    await waitForPage()
+    expect(await within(section()).findByRole('button', { name: 'Duyệt' })).toBeEnabled()
+    expect(within(section()).getByRole('button', { name: 'Từ chối' })).toBeEnabled()
+    expect(within(section()).getByRole('link', { name: 'Xem hồ sơ' })).toHaveAttribute('href', `/executor/handovers/${request.requestId}`)
+    expect(section()).toHaveTextContent('đang chờ bạn tiếp nhận')
+    // Kho có hồ sơ chờ tiếp nhận chỉ có Xem/Duyệt/Từ chối, không có nút tạo hồ sơ
+    const row = within(section()).getByText(`Kho #${request.vaultId}`).closest('li')
+    expect(within(row).queryByRole('button', { name: 'Tạo hồ sơ bàn giao' })).not.toBeInTheDocument()
+  })
+
+  it('pending_DraftHandover_HasNoAcceptDeclineButtons', async () => {
+    await createHandover(1)
+    renderPage()
+    await waitForPage()
+    await within(section()).findByRole('link', { name: 'Xem hồ sơ' })
+    expect(within(section()).queryByRole('button', { name: 'Duyệt' })).not.toBeInTheDocument()
+    expect(within(section()).queryByRole('button', { name: 'Từ chối' })).not.toBeInTheDocument()
+  })
+
+  it('accept_Clicked_AcceptsAndOpensHandoverDetail', async () => {
+    const request = await pendingRequest()
+    renderPage()
+    await waitForPage()
+    await userEvent.click(await within(section()).findByRole('button', { name: 'Duyệt' }))
+    expect(await screen.findByText('handover-detail-page')).toBeInTheDocument()
+    expect(getDb().handovers.find((item) => item.requestId === request.requestId).status).toBe('Draft')
+  })
+
+  it('accept_ServerConflict_ShowsReadableErrorAndStaysOnPage', async () => {
+    await pendingRequest()
+    server.use(http.post('*/api/executor/handovers/:requestId/accept', () => HttpResponse.json({ status: 409, detail: 'x' }, { status: 409 })))
+    renderPage()
+    await waitForPage()
+    await userEvent.click(await within(section()).findByRole('button', { name: 'Duyệt' }))
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    expect(screen.queryByText('handover-detail-page')).not.toBeInTheDocument()
+  })
+
+  it('decline_NeedsReason_ThenDeclinesAndNotifiesOwner', async () => {
+    const request = await pendingRequest()
+    renderPage()
+    await waitForPage()
+    await userEvent.click(await within(section()).findByRole('button', { name: 'Từ chối' }))
+    const dialog = await screen.findByRole('dialog')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Xác nhận từ chối' }))
+    expect(getDb().handovers.find((item) => item.requestId === request.requestId).status).toBe('Pending_Executor')
+    await userEvent.type(within(dialog).getByLabelText(/Lý do từ chối/), 'Tôi không thể tiếp nhận hồ sơ này')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Xác nhận từ chối' }))
+    expect(await screen.findByText('Đã từ chối hồ sơ')).toBeInTheDocument()
+    expect(getDb().handovers.find((item) => item.requestId === request.requestId)).toMatchObject({ status: 'Declined', declineReason: 'Tôi không thể tiếp nhận hồ sơ này' })
+    expect(getDb().notifications.some((note) => note.title === 'Executor declined handover')).toBe(true)
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  })
+
+  it('decline_ServerError_KeepsDialogOpenWithMessage', async () => {
+    await pendingRequest()
+    server.use(http.post('*/api/executor/handovers/:requestId/decline', () => HttpResponse.json({ status: 403, detail: 'x' }, { status: 403 })))
+    renderPage()
+    await waitForPage()
+    await userEvent.click(await within(section()).findByRole('button', { name: 'Từ chối' }))
+    const dialog = await screen.findByRole('dialog')
+    await userEvent.type(within(dialog).getByLabelText(/Lý do từ chối/), 'Không thể nhận')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Xác nhận từ chối' }))
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Bạn không có quyền xử lý hồ sơ này.')
+  })
+})
+
 describe('ExecutorOrdersPage handover table', () => {
   it('table_NoHandovers_ShowsEmptyMessage', async () => {
     renderPage()
@@ -141,7 +217,10 @@ describe('ExecutorOrdersPage handover table', () => {
     renderPage()
     await waitForPage()
     const table = await screen.findByRole('table', { name: 'Danh sách hồ sơ bàn giao' })
-    const links = within(table).getAllByRole('link').map((link) => link.textContent)
+    const links = within(table)
+      .getAllByRole('link')
+      .map((link) => link.textContent)
+      .filter((text) => text.startsWith('HS-'))
     expect(links).toEqual([handoverCode(second), handoverCode(first)])
   })
 

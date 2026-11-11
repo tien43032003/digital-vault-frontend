@@ -7,6 +7,8 @@ import {
   getAdminPlans,
   getPaymentTransaction,
   getPaymentTransactions,
+  getPlanMonthlyStats,
+  getPlanStatistics,
   updateAdminPlan,
 } from '../../callapi/adminApi'
 import AdminPlansPage from './AdminPlansPage'
@@ -18,6 +20,9 @@ vi.mock('../../callapi/adminApi', () => ({
   deleteAdminPlan: vi.fn(),
   deleteInactivePlans: vi.fn(),
   getPaymentTransactions: vi.fn(),
+  getPlanMonthlyStats: vi.fn(),
+  getPlanStatistics: vi.fn(),
+  getPlanSubscribers: vi.fn(),
   getPaymentTransaction: vi.fn(),
 }))
 
@@ -51,6 +56,16 @@ describe('AdminPlansPage', () => {
     vi.resetAllMocks()
     getAdminPlans.mockResolvedValue([plan(1), plan(2, { isActive: false, maxStorageBytes: 500 * 1024 ** 2, durationDays: 365 })])
     getPaymentTransactions.mockResolvedValue({ page: 1, pageSize: 20, total: 1, items: [transaction(7)] })
+  })
+
+  it('statsTab_Clicked_ShowsPlanStatisticsAndHidesPlanActions', async () => {
+    getPlanMonthlyStats.mockResolvedValue({ month: '2026-11', totalSold: 2, totalRevenue: 198000, items: [{ planId: 1, planName: 'Gói thử', soldCount: 2, revenue: 198000, activeUsers: 2 }] })
+    getPlanStatistics.mockResolvedValue([{ planId: 1, planName: 'Gói thử', price: 99000, durationDays: 30, isActive: true, activeUsersCount: 2, scheduledUsersCount: 0, expiredUsersCount: 0, totalSubscribersCount: 2, totalRevenue: 198000 }])
+    render(<AdminPlansPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Thống kê gói' }))
+    expect(await screen.findByRole('table', { name: 'Thống kê gói dịch vụ' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'GÓI ĐÃ BÁN TRONG THÁNG' })).toHaveTextContent('2')
+    expect(screen.queryByRole('button', { name: 'Thêm gói' })).not.toBeInTheDocument()
   })
 
   it('plans_Loaded_ShowsLimitsPriceDurationAndSellingStatus', async () => {

@@ -1,4 +1,4 @@
-import { HANDOVER_GROUPS, createHandoverErrorMessage, filterHandovers, handoverCode, handoverStatusInfo, declineReasonFromNotifications, handoverActionErrorMessage, isCancellableStatus, isEditableStatus, isVaultLockedByHandover, ownerCreateHandoverErrorMessage } from './handover'
+import { HANDOVER_GROUPS, executorNextAction, createHandoverErrorMessage, filterHandovers, handoverCode, handoverStatusInfo, declineReasonFromNotifications, handoverActionErrorMessage, isCancellableStatus, isEditableStatus, isVaultLockedByHandover, ownerCreateHandoverErrorMessage } from './handover'
 
 describe('handoverStatusInfo', () => {
   it.each([
@@ -44,15 +44,16 @@ describe('filterHandovers', () => {
     { requestId: 5, status: 'In_Progress' },
     { requestId: 6, status: 'Completed' },
     { requestId: 7, status: 'Cancelled' },
+    { requestId: 8, status: 'Rejected' },
   ]
   const ids = (statuses) => filterHandovers(list, statuses).map((item) => item.requestId)
 
   it('filterHandovers_NoStatuses_ReturnsAllNewestFirst', () => {
-    expect(ids(undefined)).toEqual([7, 6, 5, 4, 3, 2, 1])
+    expect(ids(undefined)).toEqual([8, 7, 6, 5, 4, 3, 2, 1])
   })
 
   it('filterHandovers_Groups_PickTheRightStatuses', () => {
-    expect(ids(HANDOVER_GROUPS.pending)).toEqual([3, 2])
+    expect(ids(HANDOVER_GROUPS.pending)).toEqual([8, 3, 2])
     expect(ids(HANDOVER_GROUPS.approved)).toEqual([4])
     expect(ids(HANDOVER_GROUPS.inProgress)).toEqual([5])
     expect(ids(HANDOVER_GROUPS.history)).toEqual([7, 6])
@@ -228,5 +229,23 @@ describe('handoverCode', () => {
   it('code_DateWithoutTimezone_IsReadAsUtcLikeTheRestOfTheApp', () => {
     // 31/12 23:30 UTC đã sang năm mới ở Việt Nam (UTC+7) nhưng vẫn là cùng một mốc với chuỗi có Z
     expect(handoverCode({ requestId: 3, initiatedAt: '2026-12-31T23:30:00' })).toBe(handoverCode({ requestId: 3, initiatedAt: '2026-12-31T23:30:00Z' }))
+  })
+})
+
+describe('executorNextAction', () => {
+  it.each([
+    ['Pending_Executor', 'Xem và tiếp nhận', 'link'],
+    ['Draft', 'Tiếp tục hồ sơ', 'link'],
+    ['Pending_Legal', 'Theo dõi thẩm định', 'link'],
+    ['Additional_Info', 'Bổ sung và gửi lại', 'link'],
+    ['Rejected', 'Bổ sung và gửi lại', 'link'],
+    ['Approved', 'Bắt đầu bàn giao', 'start'],
+    ['In_Progress', 'Hoàn tất bàn giao', 'link'],
+    ['Completed', 'Xem hồ sơ', 'link'],
+    ['Cancelled', 'Xem hồ sơ', 'link'],
+    ['Declined', 'Xem hồ sơ', 'link'],
+    ['Unknown', 'Xem hồ sơ', 'link'],
+  ])('%s_GivesTheRightNextStep', (status, label, kind) => {
+    expect(executorNextAction(status)).toMatchObject({ label, kind })
   })
 })

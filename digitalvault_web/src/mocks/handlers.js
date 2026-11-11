@@ -903,11 +903,10 @@ const coreHandlers = [
       }
       const form = await readForm(request)
       if (!form) return problem(400, 'Request must be multipart/form-data.')
-      if (hasUnknownFormFields(form, ['VerifierId', 'Comment', 'Evidence'])) return problem(400, 'Unexpected form field.')
-      if (!handover.documents.some((item) => item.purpose === 'DeathCertificate')) {
-        return problem(400, 'A death certificate must be uploaded before legal submission.')
-      }
+      if (hasUnknownFormFields(form, ['VerifierId', 'Comment', 'Evidence', 'Signature'])) return problem(400, 'Unexpected form field.')
       if (!isValidDocument(fieldOf(form, 'Evidence'))) return problem(400, 'Evidence must be 1 byte to 10 MB and a PDF, PNG, JPEG or text file.')
+      const evidenceSignature = fieldOf(form, 'Signature')
+      if (evidenceSignature !== null && !isValidSignature(evidenceSignature)) return problem(400, 'Invalid detached signature size.')
       const comment = fieldOf(form, 'Comment')
       if (typeof comment === 'string' && comment.length > 2000) return problem(400, 'Comment exceeds 2000 characters.')
       const verifierId = Number(fieldOf(form, 'VerifierId'))

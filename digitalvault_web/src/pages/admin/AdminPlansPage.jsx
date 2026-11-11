@@ -7,6 +7,7 @@ import DeleteInactivePlansModal from '../../components/admin/DeleteInactivePlans
 import DeletePlanModal from '../../components/admin/DeletePlanModal'
 import PaymentTransactionsPanel from '../../components/admin/PaymentTransactionsPanel'
 import PlanFormModal from '../../components/admin/PlanFormModal'
+import PlanStatisticsPanel from '../../components/admin/PlanStatisticsPanel'
 import AppToast from '../../components/common/AppToast'
 import { useAdminResource } from '../../hooks/useAdminResource'
 import { adminPlanErrorMessage, formatDuration, formatStorage, formatVnd, planFormToInput, planToForm } from '../../utils/payment'
@@ -14,9 +15,10 @@ import { adminPlanErrorMessage, formatDuration, formatStorage, formatVnd, planFo
 const TABS = [
   { key: 'plans', label: 'Gói dịch vụ' },
   { key: 'transactions', label: 'Giao dịch thanh toán' },
+  { key: 'stats', label: 'Thống kê gói' },
 ]
 
-// Trang "Gói dịch vụ & thanh toán" của Admin: quản lý gói (thêm, sửa, xóa, bật/tắt bán) và xem giao dịch của mọi người dùng
+// Trang "Gói dịch vụ & thanh toán" của Admin: quản lý gói (thêm, sửa, xóa, bật/tắt bán), xem giao dịch của mọi người dùng và thống kê bán gói
 export default function AdminPlansPage() {
   const [tab, setTab] = useState('plans')
   const [dialog, setDialog] = useState(null) // { type: 'create' | 'edit' | 'delete', plan? }
@@ -226,9 +228,13 @@ export default function AdminPlansPage() {
             </div>
           )}
         </section>
-      ) : (
+      ) : tab === 'transactions' ? (
         <section className="av-panel" aria-label="Giao dịch thanh toán">
           <PaymentTransactionsPanel />
+        </section>
+      ) : (
+        <section className="av-panel" aria-label="Thống kê gói">
+          <PlanStatisticsPanel />
         </section>
       )}
 

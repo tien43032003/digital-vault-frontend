@@ -62,9 +62,13 @@ export async function getHandoverReceipt(handoverId) {
 		throw error
 	}
 }
-// Xác nhận đã nhận tài sản (ReceiptInput { note }); trả ReceiptDto
-export async function confirmHandoverReceipt(handoverId, note) {
+// Xác nhận đã nhận tài sản: multipart File (tệp xác nhận) + Signature (chữ ký số rời) bắt buộc, Note tuỳ chọn; trả ReceiptDto
+export async function confirmHandoverReceipt(handoverId, { note, file, signature }) {
+	const form = new FormData()
+	form.append('File', file)
+	form.append('Signature', signature)
 	const trimmed = note?.trim()
-	const { data } = await axiosClient.post(`/beneficiary/handovers/${handoverId}/receipt`, { note: trimmed || null })
+	if (trimmed) form.append('Note', trimmed)
+	const { data } = await axiosClient.post(`/beneficiary/handovers/${handoverId}/receipt`, form)
 	return data
 }

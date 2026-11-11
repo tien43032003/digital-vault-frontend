@@ -1,14 +1,16 @@
 import { FileText } from 'lucide-react'
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Alert, Button } from 'react-bootstrap'
 import { Link, useNavigate } from 'react-router-dom'
-import { createHandover } from '../../callapi/executorApi'
+import { acceptHandover, createHandover, declineHandover } from '../../callapi/executorApi'
+import AppToast from '../../components/common/AppToast'
 import MockNotice from '../../components/common/MockNotice'
+import DeclineHandoverModal from '../../components/executor/DeclineHandoverModal'
 import HandoverTable from '../../components/executor/HandoverTable'
 import { useExecutorPortal } from '../../hooks/useExecutorPortal'
 import { MOCK_MODE } from '../../mocks/mode'
 import { vaultLabel, vaultNamesOf } from '../../utils/executor'
-import { createHandoverErrorMessage, filterHandovers } from '../../utils/handover'
+import { createHandoverErrorMessage, filterHandovers, handoverActionErrorMessage } from '../../utils/handover'
 import { formatDate } from '../../utils/proofOfLife'
 
 const ASSIGNMENT_STATUS_LABELS = { Active: 'Đang hiệu lực', AutoAssigned: 'Phân công tự động' }
@@ -19,6 +21,11 @@ export default function ExecutorOrdersPage({ mockMode = MOCK_MODE }) {
   const navigate = useNavigate()
   const [creatingVaultId, setCreatingVaultId] = useState(null)
   const [createError, setCreateError] = useState('')
+  // Hồ sơ chủ kho giao (Pending_Executor): Duyệt (accept) hoặc Từ chối kèm lý do (decline) ngay trong danh sách kho
+  const [acceptingId, setAcceptingId] = useState(null)
+  const [decliningRequest, setDecliningRequest] = useState(null)
+  const [toast, setToast] = useState(null)
+  const closeToast = useCallback(() => setToast(null), [])
 
   const handleCreate = async (vaultId) => {
     setCreatingVaultId(vaultId)
@@ -30,6 +37,34 @@ export default function ExecutorOrdersPage({ mockMode = MOCK_MODE }) {
       setCreateError(createHandoverErrorMessage(caught))
       setCreatingVaultId(null)
     }
+  }
+
+  // Duyệt: hồ sơ sang Bản nháp rồi vào chi tiết để nộp giấy chứng tử và làm hồ sơ bàn giao
+  const handleAccept = async (requestId) => {
+    setAcceptingId(requestId)
+    setCreateError('')
+    try {
+      await acceptHandover(requestId)
+      navigate(`/executor/handovers/${requestId}`)
+    } catch (caught) {
+      // 409: hồ sơ đã đổi trạng thái (chủ kho hủy...) nên tải lại cho khớp máy chủ
+      if (caught?.status === 409) reload()
+      setCreateError(handoverActionErrorMessage(caught, 'accept'))
+      setAcceptingId(null)
+    }
+  }
+
+  // Từ chối: BE thu hồi phân công, trả hồ sơ về chủ kho kèm lý do và gửi thông báo cho chủ kho; lỗi được ném lại dạng tiếng Việt cho hộp thoại hiển thị
+  const handleDecline = async (reason) => {
+    try {
+      await declineHandover(decliningRequest.requestId, reason)
+    } catch (caught) {
+      if (caught?.status === 409) reload()
+      throw new Error(handoverActionErrorMessage(caught, 'decline'), { cause: caught })
+    }
+    setDecliningRequest(null)
+    setToast({ title: 'Đã từ chối hồ sơ', detail: 'Chủ kho đã nhận được lý do từ chối và có thể chọn người thi hành khác.' })
+    reload()
   }
 
   if (status === 'loading') {
@@ -88,11 +123,24 @@ export default function ExecutorOrdersPage({ mockMode = MOCK_MODE }) {
                   <div className="av-doc-main">
                     <p className="mb-0 fs-13 fw-semibold text-ink">{vaultLabel(assignment.vaultId, assignment.vaultName)}</p>
                     {assignment.owner?.fullName && <p className="mb-0 fs-12 text-slate-600">{`Chủ kho: ${assignment.owner.fullName}`}</p>}
+                    {open?.status === 'Pending_Executor' && <p className="mb-0 fs-12 fw-semibold text-brand">Chủ kho đã giao hồ sơ, đang chờ bạn tiếp nhận</p>}
                     <p className="mb-0 fs-12 text-slate-500">
                       {`${ASSIGNMENT_STATUS_LABELS[assignment.status] ?? assignment.status} · phân công ${formatDate(assignment.assignedAt)}`}
                     </p>
                   </div>
-                  {open ? (
+                  {open?.status === 'Pending_Executor' ? (
+                    <div className="d-flex flex-wrap align-items-center justify-content-end gap-2">
+                      <Link to={`/executor/handovers/${open.requestId}`} className="av-ghost-btn is-brand">
+                        Xem hồ sơ
+                      </Link>
+                      <Button type="button" variant="primary" className="av-btn av-btn-sm" disabled={acceptingId !== null} onClick={() => handleAccept(open.requestId)}>
+                        {acceptingId === open.requestId ? 'Đang xử lý...' : 'Duyệt'}
+                      </Button>
+                      <Button type="button" variant="light" className="av-btn av-btn-sm border" disabled={acceptingId !== null} onClick={() => setDecliningRequest(open)}>
+                        Từ chối
+                      </Button>
+                    </div>
+                  ) : open ? (
                     <Link to={`/executor/handovers/${open.requestId}`} className="av-ghost-btn is-brand">
                       Xem hồ sơ
                     </Link>
@@ -120,6 +168,9 @@ export default function ExecutorOrdersPage({ mockMode = MOCK_MODE }) {
         </h2>
         {handovers.length === 0 ? <p className="av-empty mb-0">Chưa có hồ sơ bàn giao nào.</p> : <HandoverTable handovers={filterHandovers(handovers)} vaultNames={vaultNamesOf(assignments)} />}
       </section>
+
+      {decliningRequest && <DeclineHandoverModal requestId={decliningRequest.requestId} onClose={() => setDecliningRequest(null)} onSubmit={handleDecline} />}
+      <AppToast show={Boolean(toast)} onClose={closeToast} title={toast?.title} detail={toast?.detail} />
     </div>
   )
 }

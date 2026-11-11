@@ -2,7 +2,7 @@ import { ExternalLink, FileCheck2, RefreshCw } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Alert, Button, Table } from 'react-bootstrap'
 import { Link } from 'react-router-dom'
-import { getLegalHandovers } from '../../callapi/legalApi'
+import { getLegalHandovers, getLegalHandoversByStatuses } from '../../callapi/legalApi'
 import AdminPager from '../../components/admin/AdminPager'
 import HandoverStatusBadge from '../../components/executor/HandoverStatusBadge'
 import { useAdminList } from '../../hooks/useAdminList'
@@ -14,13 +14,16 @@ export default function LegalHandoverListPage({
   title = 'Hồ sơ chờ thẩm định',
   description = 'Xem và thẩm định tính pháp lý của các hồ sơ bàn giao do Người thi hành nộp.',
   status = 'Pending_Legal',
+  statuses = null,
   emptyMessage = 'Không có hồ sơ nào trong danh mục này.',
 }) {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
-  const params = useMemo(() => ({ page, pageSize, status }), [page, pageSize, status])
-  const { items: handovers, error, loading, reload } = useAdminList(getLegalHandovers, params)
+  // statuses: gộp hồ sơ của nhiều trạng thái (vd tab "Đã duyệt" gồm cả hồ sơ đã chuyển sang đang bàn giao / hoàn tất)
+  const statusKey = statuses ? statuses.join(',') : ''
+  const params = useMemo(() => (statusKey ? { page, pageSize, statuses: statusKey.split(',') } : { page, pageSize, status }), [page, pageSize, status, statusKey])
+  const { items: handovers, error, loading, reload } = useAdminList(statusKey ? getLegalHandoversByStatuses : getLegalHandovers, params)
 
   return (
     <div className="d-flex flex-column gap-4">

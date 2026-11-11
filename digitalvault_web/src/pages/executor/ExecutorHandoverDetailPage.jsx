@@ -27,6 +27,7 @@ import { downloadBlob } from '../../utils/download'
 import { handoverOwnerName, vaultLabel } from '../../utils/executor'
 import { canShowChat } from '../../utils/chat'
 import { handoverActionErrorMessage, handoverCode, isEditableStatus } from '../../utils/handover'
+import { documentSubmittedLabel, handoverActionErrorMessage, handoverCode, isEditableStatus } from '../../utils/handover'
 import { formatDateTime } from '../../utils/proofOfLife'
 
 const CASE_STATUS_LABELS = { Pending: 'Chờ bàn giao', In_Progress: 'Đang chuyển giao', Completed: 'Đã bàn giao', Received: 'Đã nhận' }
@@ -164,6 +165,20 @@ export default function ExecutorHandoverDetailPage({ mockMode = MOCK_MODE }) {
 
       {actionError && <Alert variant="danger" className="av-alert mb-0">{actionError}</Alert>}
 
+      {(handover.status === 'Rejected' || handover.status === 'Additional_Info') && (
+        <Alert variant={handover.status === 'Rejected' ? 'danger' : 'warning'} className="av-alert mb-0">
+          <div className="fw-bold mb-1">
+            {handover.status === 'Rejected' ? 'Hồ sơ bị Pháp lý từ chối / Yêu cầu bổ sung' : 'Pháp lý yêu cầu bổ sung thông tin'}
+            {handover.legalVerifierName ? ` (Người thẩm định: ${handover.legalVerifierName})` : ''}
+          </div>
+          <div>
+            <strong>Lý do / Yêu cầu từ Pháp lý:</strong>{' '}
+            {handover.legalComment || 'Vui lòng kiểm tra lại giấy tờ chứng tử và bằng chứng pháp lý rồi gửi thẩm định lại.'}
+          </div>
+          {handover.legalReviewedAt && <div className="fs-11 text-slate-500 mt-1">Thời gian phản hồi: {formatDateTime(handover.legalReviewedAt)}</div>}
+        </Alert>
+      )}
+
       {handover.status === 'Pending_Executor' && (
         <HandoverIntakePanel requestId={handover.requestId} busy={actionBusy} onAccept={handleAccept} onDecline={handleDecline} />
       )}
@@ -221,6 +236,7 @@ export default function ExecutorHandoverDetailPage({ mockMode = MOCK_MODE }) {
                     </span>
                     <div className="av-doc-main">
                       <p className="mb-0 fs-13 fw-semibold text-ink text-truncate">{document.fileName}</p>
+                      {documentSubmittedLabel(document) && <p className="mb-0 fs-11 text-slate-500">{documentSubmittedLabel(document)}</p>}
                     </div>
                     {document.isEncrypted && (
                       <span className="av-badge av-badge-ok">
@@ -245,7 +261,7 @@ export default function ExecutorHandoverDetailPage({ mockMode = MOCK_MODE }) {
           <DocumentUploadForm
             idPrefix="death-certificate"
             title="Nộp giấy chứng tử"
-            description="Bắt buộc trước khi gửi thẩm định pháp lý. Chỉ Người thi hành được phân công mới nộp được."
+            description="Không bắt buộc: có thể nộp để hỗ trợ thẩm định, không nộp vẫn gửi thẩm định được. Chỉ Người thi hành được phân công mới nộp được."
             fileLabel="Giấy chứng tử"
             submitLabel="Nộp giấy chứng tử"
             onSubmit={submitFile(uploadDeathCertificate, 'Đã nộp giấy chứng tử')}
