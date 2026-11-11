@@ -45,6 +45,11 @@ describe('describeSubscription', () => {
     expect(describeSubscription(free, NOW)).toMatchObject({ key: 'free', label: 'Gói miễn phí', tone: 'muted', daysLeft: null })
   })
 
+  it('describe_NoPriceInData_IsTreatedAsPaidSoDatesDecide', () => {
+    const item = { status: 'Active', startDate: new Date(NOW - 10 * DAY).toISOString(), endDate: new Date(NOW + 3 * DAY).toISOString() }
+    expect(describeSubscription(item, NOW)).toMatchObject({ key: 'expiring', daysLeft: 3 })
+  })
+
   it('describe_InvalidDates_FallsBackToExpired', () => {
     expect(describeSubscription({ status: 'Active', price: 99000, startDate: 'x', endDate: 'y' }, NOW).key).toBe('expired')
   })
