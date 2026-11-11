@@ -210,3 +210,32 @@ describe('ExecutorHandoverDetailPage document download', () => {
     expect(clicked).toEqual([])
   })
 })
+
+describe('ExecutorHandoverDetailPage chat', () => {
+  it.each(['Pending_Legal', 'Additional_Info', 'Approved', 'In_Progress', 'Completed', 'Rejected'])('chat_StatusWithLegalReview_ShowsPanel', async (status) => {
+    const id = await createWithStatus(status)
+    renderDetail(id)
+    await waitForDetail()
+    expect(await screen.findByRole('region', { name: 'Trao đổi hồ sơ bàn giao' })).toBeInTheDocument()
+  })
+
+  it.each(['Draft', 'Pending_Executor', 'Declined'])('chat_StatusBeforeLegalReview_HidesPanel', async (status) => {
+    const id = await createWithStatus(status)
+    renderDetail(id)
+    await waitForDetail()
+    expect(screen.queryByRole('region', { name: 'Trao đổi hồ sơ bàn giao' })).not.toBeInTheDocument()
+  })
+
+  it('chat_Panel_ShowsMessagesAndSendsNewOne', async () => {
+    const id = await createWithStatus('Pending_Legal')
+    sessionStorage.setItem('aeterna.user', JSON.stringify({ userId: EXECUTOR.userId, roles: ['Executor'], email: EXECUTOR.email }))
+    renderDetail(id)
+    await waitForDetail()
+    const panel = await screen.findByRole('region', { name: 'Trao đổi hồ sơ bàn giao' })
+    await screen.findByText(/Chưa có tin nhắn nào/)
+    await userEvent.type(within(panel).getByRole('textbox', { name: 'Nội dung tin nhắn' }), 'Đã bổ sung giấy tờ')
+    await userEvent.click(within(panel).getByRole('button', { name: 'Gửi' }))
+    expect(await within(panel).findByText('Đã bổ sung giấy tờ')).toBeInTheDocument()
+    expect(within(panel).getByText('Bạn')).toBeInTheDocument()
+  })
+})

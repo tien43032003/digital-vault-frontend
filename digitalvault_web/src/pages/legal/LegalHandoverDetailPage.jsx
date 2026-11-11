@@ -17,10 +17,12 @@ import { Link, useParams } from 'react-router-dom'
 import { downloadLegalHandoverDocument } from '../../callapi/legalApi'
 import AppToast from '../../components/common/AppToast'
 import HandoverStatusBadge from '../../components/executor/HandoverStatusBadge'
+import HandoverChatPanel from '../../components/handover/HandoverChatPanel'
 import ReviewActionModal from '../../components/legal/ReviewActionModal'
 import OwnerStatusCard from '../../components/legal/OwnerStatusCard'
 import ReviewHistory from '../../components/legal/ReviewHistory'
 import { useLegalHandoverDetail } from '../../hooks/useLegalHandoverDetail'
+import { canShowChat } from '../../utils/chat'
 import { downloadBlob } from '../../utils/download'
 import { assetTypeLabel, formatAllocation } from '../../utils/catalog'
 import { vaultLabel } from '../../utils/executor'
@@ -486,6 +488,9 @@ export default function LegalHandoverDetailPage() {
 
       {/* Lịch sử các lần thẩm định của hồ sơ */}
       <ReviewHistory entries={handover.history ?? []} />
+
+      {/* Trao đổi với Executor của hồ sơ */}
+      {canShowChat(currentStatus) && <HandoverChatPanel requestId={handover.requestId} counterpart="người thi hành" />}
 
       {/* Modal xác nhận thẩm định kèm ô nhập nhận xét validation 1-2000 ký tự */}
       {reviewModalType && (

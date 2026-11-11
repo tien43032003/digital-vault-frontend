@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw'
 import { getDb, nextId, saveDb, setSessionUserId } from './db'
 import { adminHandlers } from './adminHandlers'
+import { chatHandlers } from './chatHandlers'
 import { extraHandlers } from './extraHandlers'
 import { paymentHandlers } from './paymentHandlers'
 import { notify } from './notifications'
@@ -969,5 +970,5 @@ const coreHandlers = [
 ]
 
 // Mock đầy đủ = API đã có ở BE + API chưa có; chế độ hỗn hợp chỉ mock phần BE chưa có
-export const handlers = [...coreHandlers, ...adminHandlers, ...paymentHandlers, ...extraHandlers, ...legalHandlers]
+export const handlers = [...coreHandlers, ...adminHandlers, ...paymentHandlers, ...chatHandlers, ...extraHandlers, ...legalHandlers]
 export const hybridHandlers = [...extraHandlers, ...legalHandlers]
