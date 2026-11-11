@@ -9,9 +9,10 @@ const time = (value) => parseServerDate(value).getTime()
 
 // Trạng thái hiển thị của một đăng ký gói cho Admin, tự tính từ ngày tháng để luôn khớp với thời điểm đang xem
 // Trả { key, label, tone, daysLeft }; daysLeft = null với gói miễn phí (không có hạn)
+// Dữ liệu không có giá (vd danh sách người dùng của một gói) thì coi là gói trả phí và dựa vào ngày tháng
 export function describeSubscription(item, now = Date.now()) {
   if (item.status === 'Scheduled') return { key: 'scheduled', label: 'Chờ kích hoạt', tone: 'info', daysLeft: null }
-  if (!(Number(item.price) > 0) && item.status !== 'Expired') return { key: 'free', label: 'Gói miễn phí', tone: 'muted', daysLeft: null }
+  if (item.price !== undefined && !(Number(item.price) > 0) && item.status !== 'Expired') return { key: 'free', label: 'Gói miễn phí', tone: 'muted', daysLeft: null }
 
   const end = time(item.endDate)
   if (item.status === 'Expired' || Number.isNaN(end) || end <= now) return { key: 'expired', label: 'Đã hết hạn', tone: 'danger', daysLeft: 0 }

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getPlanMonthlyStats, getPlanStatistics, getPlanSubscribers } from '../../callapi/adminApi'
 import { currentMonthKey } from '../../utils/payment'
 import PlanStatisticsPanel from './PlanStatisticsPanel'
@@ -16,8 +16,13 @@ const lifetime = [
 const subscribers = { page: 1, pageSize: 10, total: 2, items: [{ subscriptionId: 11, userId: 5, fullName: 'Nguyễn Văn A', email: 'a@example.com', status: 'Active', startDate: '2026-11-02T00:00:00', endDate: '2026-12-02T00:00:00' }, { subscriptionId: 12, userId: 6, fullName: 'Lê Thị B', email: 'b@example.com', status: 'Expired', startDate: '2026-09-01T00:00:00', endDate: '2026-10-01T00:00:00' }] }
 
 describe('PlanStatisticsPanel', () => {
+  afterEach(() => vi.useRealTimers())
+
   beforeEach(() => {
     vi.resetAllMocks()
+    // Cố định ngày hiện tại để trạng thái "đang dùng / sắp đến hạn / hết hạn" không đổi theo thời gian chạy test
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-11T10:00:00Z'))
     getPlanMonthlyStats.mockResolvedValue(monthly)
     getPlanStatistics.mockResolvedValue(lifetime)
     getPlanSubscribers.mockResolvedValue(subscribers)
@@ -70,6 +75,35 @@ describe('PlanStatisticsPanel', () => {
     expect(rows[1]).toHaveTextContent('Đã hết hạn')
   })
 
+  it('subscribers_ActiveWithFiveOrFewerDaysLeft_ShowsExpiringSoonBadgeAndDaysLeft', async () => {
+    getPlanSubscribers.mockResolvedValue({ page: 1, pageSize: 10, total: 2, items: [
+      { subscriptionId: 21, userId: 7, fullName: 'Sắp Hết', email: 'sap@example.com', status: 'Active', startDate: '2026-10-17T00:00:00', endDate: '2026-11-16T10:00:00' },
+      { subscriptionId: 22, userId: 8, fullName: 'Còn Lâu', email: 'lau@example.com', status: 'Active', startDate: '2026-11-02T00:00:00', endDate: '2026-12-02T00:00:00' },
+    ] })
+    render(<PlanStatisticsPanel />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Xem người dùng gói Gói Tiêu Chuẩn' }))
+    const table = await within(await screen.findByRole('dialog')).findByRole('table', { name: 'Người dùng của gói' })
+    const rows = within(table).getAllByRole('row').slice(1)
+    expect(rows[0]).toHaveTextContent('Sắp đến hạn')
+    expect(rows[0]).toHaveTextContent('Còn 5 ngày')
+    expect(rows[1]).toHaveTextContent('Đang dùng')
+    expect(rows[1]).toHaveTextContent('Còn 21 ngày')
+  })
+
+  it('subscribers_ExpiredAndScheduled_ShowNoDaysLeft', async () => {
+    getPlanSubscribers.mockResolvedValue({ page: 1, pageSize: 10, total: 2, items: [
+      { subscriptionId: 31, userId: 9, fullName: 'Đã Hết', email: 'het@example.com', status: 'Expired', startDate: '2026-09-01T00:00:00', endDate: '2026-10-01T00:00:00' },
+      { subscriptionId: 32, userId: 10, fullName: 'Đặt Trước', email: 'truoc@example.com', status: 'Scheduled', startDate: '2026-11-15T00:00:00', endDate: '2026-12-15T00:00:00' },
+    ] })
+    render(<PlanStatisticsPanel />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Xem người dùng gói Gói Tiêu Chuẩn' }))
+    const table = await within(await screen.findByRole('dialog')).findByRole('table', { name: 'Người dùng của gói' })
+    const rows = within(table).getAllByRole('row').slice(1)
+    expect(rows[0]).toHaveTextContent('Đã hết hạn')
+    expect(rows[0]).not.toHaveTextContent('Còn ')
+    expect(rows[1]).toHaveTextContent('Đã đặt trước')
+    expect(rows[1]).not.toHaveTextContent('Còn ')
+  })
   it('subscribers_StatusFilter_SendsStatusAndResetsPage', async () => {
     render(<PlanStatisticsPanel />)
     await userEvent.click(await screen.findByRole('button', { name: 'Xem người dùng gói Gói Tiêu Chuẩn' }))
