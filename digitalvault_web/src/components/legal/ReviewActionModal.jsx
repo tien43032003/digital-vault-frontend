@@ -6,6 +6,8 @@ import {
   rejectLegalHandover,
   requestAdditionalInfoLegalHandover,
 } from '../../callapi/legalApi'
+import { validateHandoverDocument } from '../../utils/validators'
+import FileField from '../common/FileField'
 
 const CONFIGS = {
   approve: {
@@ -18,18 +20,22 @@ const CONFIGS = {
     description:
       'Hồ sơ đã đầy đủ điều kiện pháp lý. Sau khi phê duyệt, hồ sơ sẽ chuyển sang trạng thái Đã duyệt pháp lý (Approved) để Người thi hành bắt đầu quy trình bàn giao tài sản.',
     placeholder: 'Nhập nhận xét / căn cứ phê duyệt hồ sơ pháp lý...',
+    requiresFiles: true,
+    fileLabel: 'Tệp văn bản thẩm định (quyết định duyệt)',
     api: approveLegalHandover,
   },
   reject: {
-    title: 'Từ chối hồ sơ bàn giao',
+    title: 'Từ chối / Yêu cầu bổ sung hồ sơ bàn giao',
     icon: XCircle,
     iconColor: 'text-danger',
     badgeText: 'Từ chối hồ sơ',
     submitVariant: 'danger',
-    submitText: 'Xác nhận từ chối',
+    submitText: 'Xác nhận gửi cho Người thi hành',
     description:
-      'Từ chối tiếp nhận hoặc xử lý hồ sơ này. Hồ sơ sẽ chuyển sang trạng thái Bị từ chối (Rejected). Vui lòng nêu rõ lý do từ chối để Người thi hành nắm thông tin.',
-    placeholder: 'Nêu rõ lý do từ chối hồ sơ pháp lý...',
+      'Từ chối hồ sơ hoặc yêu cầu Người thi hành bổ sung giấy tờ, bằng chứng. Hồ sơ sẽ chuyển sang trạng thái Bị từ chối (Rejected); Người thi hành thấy lý do để nộp bổ sung và gửi thẩm định lại.',
+    placeholder: 'Nêu rõ lý do từ chối hoặc các giấy tờ/bằng chứng yêu cầu Người thi hành bổ sung...',
+    requiresFiles: true,
+    fileLabel: 'Tệp văn bản thẩm định (quyết định từ chối)',
     api: rejectLegalHandover,
   },
   'additional-info': {
@@ -48,10 +54,13 @@ const CONFIGS = {
 
 const MIN_LENGTH = 1
 const MAX_LENGTH = 2000
+const DOCUMENT_ACCEPT = '.pdf,.png,.jpg,.jpeg,.txt'
 
 export default function ReviewActionModal({ show, type, requestId, onClose, onSuccess }) {
   const [comment, setComment] = useState('')
   const [validationError, setValidationError] = useState('')
+  const [files, setFiles] = useState({ file: null, signature: null })
+  const [fileErrors, setFileErrors] = useState({})
   const [apiError, setApiError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -62,6 +71,11 @@ export default function ReviewActionModal({ show, type, requestId, onClose, onSu
     const value = event.target.value
     setComment(value)
     if (validationError) setValidationError('')
+  }
+
+  const setFile = (name, value) => {
+    setFiles((prev) => ({ ...prev, [name]: value }))
+    setFileErrors((prev) => ({ ...prev, [name]: undefined }))
   }
 
   const handleSubmit = async (event) => {
@@ -79,9 +93,18 @@ export default function ReviewActionModal({ show, type, requestId, onClose, onSu
       return
     }
 
+    // Duyệt / Từ chối bắt buộc kèm tệp quyết định và chữ ký số rời (.sig)
+    if (config.requiresFiles) {
+      const errors = validateHandoverDocument(files, { signatureRequired: true })
+      if (Object.keys(errors).length > 0) {
+        setFileErrors(errors)
+        return
+      }
+    }
+
     setSubmitting(true)
     try {
-      const reviewDto = await config.api(requestId, { comment: trimmed })
+      const reviewDto = await config.api(requestId, config.requiresFiles ? { comment: trimmed, ...files } : { comment: trimmed })
       onSuccess(reviewDto)
     } catch (error) {
       setApiError(error?.message || 'Đã có lỗi xảy ra khi thực hiện thao tác.')
@@ -141,6 +164,30 @@ export default function ReviewActionModal({ show, type, requestId, onClose, onSu
               </Form.Control.Feedback>
             )}
           </Form.Group>
+
+          {config.requiresFiles && (
+            <>
+              <FileField
+                id="legal-review-file"
+                label={config.fileLabel}
+                hint="PDF, PNG, JPEG hoặc TXT, tối đa 10 MB."
+                accept={DOCUMENT_ACCEPT}
+                required
+                file={files.file}
+                error={fileErrors.file}
+                onChange={(file) => setFile('file', file)}
+              />
+              <FileField
+                id="legal-review-signature"
+                label="Chữ ký số rời (.sig)"
+                hint="File chữ ký RSA-SHA256 dạng nhị phân, tối đa 16 KB."
+                required
+                file={files.signature}
+                error={fileErrors.signature}
+                onChange={(file) => setFile('signature', file)}
+              />
+            </>
+          )}
 
           {apiError && (
             <Alert variant="danger" className="av-alert mb-0 py-2 fs-12">

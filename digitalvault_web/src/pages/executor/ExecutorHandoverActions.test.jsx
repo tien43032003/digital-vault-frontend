@@ -169,11 +169,12 @@ describe('legal verification form', () => {
     return select
   }
 
-  const fill = async (user, { verifier = '6', comment = '', evidence = pdf('BangChung.pdf') } = {}) => {
+  const fill = async (user, { verifier = '6', comment = '', evidence = pdf('BangChung.pdf'), signature = sig('BangChung.sig') } = {}) => {
     const form = region('Gửi thẩm định pháp lý')
     if (verifier) await user.selectOptions(await verifierSelect(form), verifier)
     if (comment) await user.type(within(form).getByLabelText(/^Ghi chú/), comment)
     if (evidence) await user.upload(within(form).getByLabelText(/^Bằng chứng gửi kèm/), evidence)
+    if (signature) await user.upload(within(form).getByLabelText(/^Chữ ký số rời/), signature)
     await user.click(within(form).getByRole('button', { name: 'Gửi thẩm định' }))
     return form
   }
@@ -208,9 +209,18 @@ describe('legal verification form', () => {
   it('submit_Empty_ShowsRequiredErrorsAndDoesNotCallApi', async () => {
     const user = setupUser()
     await openDetail()
-    const form = await fill(user, { verifier: '', evidence: null })
+    const form = await fill(user, { verifier: '', evidence: null, signature: null })
     expect(within(form).getByText('Vui lòng chọn người xác minh pháp lý.')).toBeInTheDocument()
     expect(within(form).getByText('Vui lòng chọn file giấy tờ.')).toBeInTheDocument()
+    expect(within(form).getByText('Vui lòng chọn file chữ ký rời.')).toBeInTheDocument()
+    expect(requestLegalVerification).not.toHaveBeenCalled()
+  })
+
+  it('submit_EvidenceWithoutSignature_ShowsSignatureRequiredAndDoesNotCallApi', async () => {
+    const user = setupUser()
+    await openDetail()
+    const form = await fill(user, { signature: null })
+    expect(within(form).getByText('Vui lòng chọn file chữ ký rời.')).toBeInTheDocument()
     expect(requestLegalVerification).not.toHaveBeenCalled()
   })
 
@@ -220,6 +230,7 @@ describe('legal verification form', () => {
     const form = region('Gửi thẩm định pháp lý')
     await user.selectOptions(await verifierSelect(form), '6')
     await user.upload(within(form).getByLabelText(/^Bằng chứng gửi kèm/), pdf())
+    await user.upload(within(form).getByLabelText(/^Chữ ký số rời/), sig())
     fireTypeLong(within(form).getByLabelText(/^Ghi chú/), 'x'.repeat(2001))
     await user.click(within(form).getByRole('button', { name: 'Gửi thẩm định' }))
     expect(within(form).getByText('Ghi chú tối đa 2000 ký tự.')).toBeInTheDocument()
@@ -238,18 +249,27 @@ describe('legal verification form', () => {
     expect(requestId).toBe(id)
     expect(input).toMatchObject({ verifierId: 6, comment: 'Hồ sơ đầy đủ' })
     expect(input.evidence.name).toBe('BangChung.pdf')
+    expect(input.signature.name).toBe('BangChung.sig')
     expect(await screen.findByText('Chờ thẩm định pháp lý')).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Gửi thẩm định pháp lý' })).not.toBeInTheDocument()
   })
 
-  it('submit_MissingDeathCertificate400_ExplainsWhatToCheck', async () => {
-    requestLegalVerification.mockRejectedValue(new ApiError(400, 'A death certificate must be uploaded before legal submission.'))
+  it('submit_Server400_ExplainsWhatToCheckWithoutRequiringDeathCertificate', async () => {
+    requestLegalVerification.mockRejectedValue(new ApiError(400, 'An independent legal verifier is required.'))
     const user = setupUser()
     await openDetail()
     const form = await fill(user)
     const alert = await within(form).findByRole('alert')
-    expect(alert).toHaveTextContent('giấy chứng tử')
-    expect(alert).toHaveTextContent('A death certificate must be uploaded before legal submission.')
+    expect(alert).toHaveTextContent('bằng chứng và chữ ký hợp lệ')
+    expect(alert).not.toHaveTextContent('đã nộp giấy chứng tử')
+    expect(alert).toHaveTextContent('An independent legal verifier is required.')
+  })
+
+  it('forms_DeathCertificateIsOptional_ShownAsNotRequired', async () => {
+    await openDetail()
+    expect(region('Nộp giấy chứng tử')).toHaveTextContent('Không bắt buộc')
+    expect(region('Gửi thẩm định pháp lý')).toHaveTextContent('Giấy chứng tử không bắt buộc')
+    expect(region('Gửi thẩm định pháp lý')).not.toHaveTextContent('Cần nộp giấy chứng tử trước')
   })
 })
 

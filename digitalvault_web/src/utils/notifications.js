@@ -141,3 +141,23 @@ export function describeLegalNotification(notification) {
   if (rule) return { title: rule.title, body: rule.body(requestId), tone: rule.tone, requestId }
   return { title: rawTitle || 'Thông báo hệ thống', body: message.replace(/Handover #(\d+)/gi, 'Hồ sơ #$1'), tone: 'info', requestId }
 }
+
+// Thông báo BE gửi cho Executor, trong đó có kết quả thẩm định pháp lý (tiêu đề tiếng Anh): dịch theo từ khóa trong tiêu đề hoặc nội dung.
+// Chưa nhận ra thì giữ nguyên chữ của BE (chỉ Việt hóa "Handover #12" thành "Hồ sơ #12") để không mất thông tin
+const EXECUTOR_RULES = [
+  { test: /additional (information|info|documents?)|supplement/i, title: 'Pháp lý yêu cầu bổ sung hồ sơ', tone: 'warn' },
+  { test: /reject/i, title: 'Pháp lý đã từ chối hồ sơ', tone: 'warn' },
+  { test: /approv/i, title: 'Pháp lý đã duyệt hồ sơ', tone: 'ok' },
+]
+
+export function describeExecutorNotification(notification) {
+  const rawTitle = notification.title ?? ''
+  const message = notification.message ?? ''
+  const found = HANDOVER_NUMBER.exec(message) ?? HANDOVER_NUMBER.exec(rawTitle)
+  const requestId = found ? Number(found[1]) : null
+  const rule = EXECUTOR_RULES.find((item) => item.test.test(`${rawTitle} ${message}`))
+  const body = message.replace(/Handover #(\d+)/gi, 'Hồ sơ #$1')
+  if (rule) return { title: rule.title, body, tone: rule.tone, requestId }
+  const generic = describeNotification(notification)
+  return { ...generic, requestId: generic.requestId ?? requestId, body: generic.body.replace(/Handover #(\d+)/gi, 'Hồ sơ #$1') }
+}

@@ -81,6 +81,23 @@ describe('LegalHandoverDetailPage - tài sản của chủ kho', () => {
     expect(screen.queryByText(/Chữ ký/)).not.toBeInTheDocument()
   })
 
+  it('executorDocuments_OnlyWithValidSignature_AreMarkedValid', async () => {
+    const doc = (documentId, fileName, signatureValid) => ({ documentId, fileName, fileType: 'application/pdf', isEncrypted: true, ...(signatureValid === undefined ? {} : { signatureValid }) })
+    getLegalHandover.mockResolvedValue({
+      ...handover,
+      documents: [doc(1, 'giay_chung_tu.pdf', true), doc(2, 'khong_co_chu_ky.pdf', null), doc(3, 'chu_ky_sai.pdf', false), doc(4, 'thieu_truong.pdf')],
+    })
+    renderPage()
+    const row = async (name) => (await screen.findByText(name)).closest('.border')
+    expect(within(await row('giay_chung_tu.pdf')).getByText('Chữ ký hợp lệ')).toBeInTheDocument()
+    for (const name of ['khong_co_chu_ky.pdf', 'chu_ky_sai.pdf', 'thieu_truong.pdf']) {
+      expect(within(await row(name)).getByText('Chữ ký không hợp lệ')).toBeInTheDocument()
+      expect(within(await row(name)).queryByText('Chữ ký hợp lệ')).not.toBeInTheDocument()
+    }
+    // Giấy tờ của Executor vẫn tải được
+    expect(within(await row('giay_chung_tu.pdf')).getByRole('button', { name: /Tải về/ })).toBeInTheDocument()
+  })
+
   it('assets_None_ShowsEmptyMessage', async () => {
     getLegalHandover.mockResolvedValue({ ...handover, assets: [], cases: [] })
     renderPage()

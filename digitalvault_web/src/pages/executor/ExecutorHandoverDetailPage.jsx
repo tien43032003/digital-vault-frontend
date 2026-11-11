@@ -17,6 +17,7 @@ import AppToast from '../../components/common/AppToast'
 import DocumentUploadForm from '../../components/executor/DocumentUploadForm'
 import HandoverIntakePanel from '../../components/executor/HandoverIntakePanel'
 import HandoverStatusBadge from '../../components/executor/HandoverStatusBadge'
+import HandoverChatPanel from '../../components/handover/HandoverChatPanel'
 import LegalVerificationForm from '../../components/executor/LegalVerificationForm'
 import { useHandover } from '../../hooks/useHandover'
 import { useVaultName } from '../../hooks/useVaultName'
@@ -24,7 +25,8 @@ import { MOCK_MODE } from '../../mocks/mode'
 import { formatAllocation } from '../../utils/catalog'
 import { downloadBlob } from '../../utils/download'
 import { handoverOwnerName, vaultLabel } from '../../utils/executor'
-import { handoverActionErrorMessage, handoverCode, isEditableStatus } from '../../utils/handover'
+import { canShowChat } from '../../utils/chat'
+import { documentSubmittedLabel, handoverActionErrorMessage, handoverCode, isEditableStatus } from '../../utils/handover'
 import { formatDateTime } from '../../utils/proofOfLife'
 
 const CASE_STATUS_LABELS = { Pending: 'Chờ bàn giao', In_Progress: 'Đang chuyển giao', Completed: 'Đã bàn giao', Received: 'Đã nhận' }
@@ -162,6 +164,20 @@ export default function ExecutorHandoverDetailPage({ mockMode = MOCK_MODE }) {
 
       {actionError && <Alert variant="danger" className="av-alert mb-0">{actionError}</Alert>}
 
+      {(handover.status === 'Rejected' || handover.status === 'Additional_Info') && (
+        <Alert variant={handover.status === 'Rejected' ? 'danger' : 'warning'} className="av-alert mb-0">
+          <div className="fw-bold mb-1">
+            {handover.status === 'Rejected' ? 'Hồ sơ bị Pháp lý từ chối / Yêu cầu bổ sung' : 'Pháp lý yêu cầu bổ sung thông tin'}
+            {handover.legalVerifierName ? ` (Người thẩm định: ${handover.legalVerifierName})` : ''}
+          </div>
+          <div>
+            <strong>Lý do / Yêu cầu từ Pháp lý:</strong>{' '}
+            {handover.legalComment || 'Vui lòng kiểm tra lại giấy tờ chứng tử và bằng chứng pháp lý rồi gửi thẩm định lại.'}
+          </div>
+          {handover.legalReviewedAt && <div className="fs-11 text-slate-500 mt-1">Thời gian phản hồi: {formatDateTime(handover.legalReviewedAt)}</div>}
+        </Alert>
+      )}
+
       {handover.status === 'Pending_Executor' && (
         <HandoverIntakePanel requestId={handover.requestId} busy={actionBusy} onAccept={handleAccept} onDecline={handleDecline} />
       )}
@@ -219,6 +235,7 @@ export default function ExecutorHandoverDetailPage({ mockMode = MOCK_MODE }) {
                     </span>
                     <div className="av-doc-main">
                       <p className="mb-0 fs-13 fw-semibold text-ink text-truncate">{document.fileName}</p>
+                      {documentSubmittedLabel(document) && <p className="mb-0 fs-11 text-slate-500">{documentSubmittedLabel(document)}</p>}
                     </div>
                     {document.isEncrypted && (
                       <span className="av-badge av-badge-ok">
@@ -243,11 +260,7 @@ export default function ExecutorHandoverDetailPage({ mockMode = MOCK_MODE }) {
           <DocumentUploadForm
             idPrefix="death-certificate"
             title="Nộp giấy chứng tử"
-            description={
-              handover.requestType === 'DeadManSwitch'
-                ? 'Bắt buộc trước khi gửi thẩm định pháp lý đối với hồ sơ kích hoạt do quá hạn điểm danh.'
-                : 'Chỉ bắt buộc khi hồ sơ kích hoạt do quá hạn điểm danh. Hồ sơ do Chủ sở hữu chủ động tạo không bắt buộc nộp giấy chứng tử.'
-            }
+            description="Không bắt buộc: có thể nộp để hỗ trợ thẩm định, không nộp vẫn gửi thẩm định được. Chỉ Người thi hành được phân công mới nộp được."
             fileLabel="Giấy chứng tử"
             submitLabel="Nộp giấy chứng tử"
             onSubmit={submitFile(uploadDeathCertificate, 'Đã nộp giấy chứng tử')}
@@ -339,6 +352,8 @@ export default function ExecutorHandoverDetailPage({ mockMode = MOCK_MODE }) {
           <strong>Hồ sơ đã bị hủy</strong> — không thể chỉnh sửa thêm.
         </p>
       )}
+
+      {canShowChat(handover.status) && <HandoverChatPanel requestId={handover.requestId} counterpart="người thẩm định" />}
 
       <AppToast show={Boolean(toast)} onClose={closeToast} title={toast?.title} detail={toast?.detail} />
     </div>

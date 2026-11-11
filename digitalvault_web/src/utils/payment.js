@@ -294,3 +294,17 @@ export function adminPlanErrorMessage(error, action = 'save') {
 }
 
 export const ADMIN_PAYMENT_STATUSES = ['Success', 'Pending', 'Failed']
+
+// Tháng hiện tại dạng "yyyy-MM" (giá trị của ô chọn tháng và tham số month của API thống kê)
+export function currentMonthKey(now = new Date()) {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
+
+// Trạng thái đăng ký gói của người dùng (UserSubscription.Status) và tông màu huy hiệu
+const SUBSCRIBER_STATUS_INFO = {
+  Active: { text: 'Đang dùng', tone: 'ok' },
+  Scheduled: { text: 'Đã đặt trước', tone: 'caution' },
+  Expired: { text: 'Đã hết hạn', tone: 'muted' },
+}
+export const SUBSCRIBER_STATUSES = Object.keys(SUBSCRIBER_STATUS_INFO)
+export const subscriberStatusInfo = (status) => SUBSCRIBER_STATUS_INFO[status] ?? { text: status || '—', tone: 'muted' }

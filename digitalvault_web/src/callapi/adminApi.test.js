@@ -2,6 +2,9 @@ import axiosClient from './axiosClient'
 import {
   getAdminRoles,
   getAdminUsers,
+  getPlanMonthlyStats,
+  getPlanStatistics,
+  getPlanSubscribers,
   getIntegrations,
   getKeyRotation,
   getSecurityAlerts,
@@ -16,6 +19,40 @@ import {
 vi.mock('./axiosClient', () => ({
   default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
 }))
+
+describe('adminApi plan statistics', () => {
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('getPlanMonthlyStats_Month_SendsMonthParam', async () => {
+    axiosClient.get.mockResolvedValue({ data: { month: '2026-11', totalSold: 3, totalRevenue: 297000, items: [] } })
+    await expect(getPlanMonthlyStats('2026-11')).resolves.toMatchObject({ totalSold: 3 })
+    expect(axiosClient.get).toHaveBeenCalledWith('/admin/subscription-plans/stats', { params: { month: '2026-11' } })
+  })
+
+  it('getPlanMonthlyStats_NoMonth_SendsNoParams', async () => {
+    axiosClient.get.mockResolvedValue({ data: {} })
+    await getPlanMonthlyStats()
+    expect(axiosClient.get).toHaveBeenCalledWith('/admin/subscription-plans/stats', { params: undefined })
+  })
+
+  it('getPlanStatistics_ArrayOrPage_ReturnsArray', async () => {
+    axiosClient.get.mockResolvedValueOnce({ data: [{ planId: 1 }] })
+    await expect(getPlanStatistics()).resolves.toEqual([{ planId: 1 }])
+    axiosClient.get.mockResolvedValueOnce({ data: { items: [{ planId: 2 }] } })
+    await expect(getPlanStatistics()).resolves.toEqual([{ planId: 2 }])
+    expect(axiosClient.get).toHaveBeenCalledWith('/admin/subscription-plans/statistics')
+  })
+
+  it('getPlanSubscribers_StatusAndPaging_SendsParamsAndOmitsEmptyStatus', async () => {
+    axiosClient.get.mockResolvedValue({ data: { page: 2, pageSize: 10, total: 30, items: [] } })
+    await getPlanSubscribers(4, { page: 2, pageSize: 10, status: 'Active' })
+    expect(axiosClient.get).toHaveBeenCalledWith('/admin/subscription-plans/4/subscribers', { params: { page: 2, pageSize: 10, status: 'Active' } })
+    await getPlanSubscribers(4)
+    expect(axiosClient.get).toHaveBeenLastCalledWith('/admin/subscription-plans/4/subscribers', { params: { page: 1, pageSize: 20 } })
+  })
+})
 
 describe('adminApi users', () => {
   afterEach(() => {

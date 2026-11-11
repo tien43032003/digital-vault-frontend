@@ -179,10 +179,11 @@ describe('mock death certificate and evidence', () => {
 })
 
 describe('mock legal verification request', () => {
-  it('post_WithoutDeathCertificate_Returns400', async () => {
+  it('post_WithoutDeathCertificate_IsAllowedAndMovesToPendingLegal', async () => {
     const request = await createHandover(1)
-    const result = await attempt(() => requestLegalVerification(request.requestId, { verifierId: VERIFIER.userId, evidence: pdf() }))
-    expect(result.status).toBe(400)
+    const result = await attempt(() => requestLegalVerification(request.requestId, { verifierId: VERIFIER.userId, evidence: pdf(), signature: sig() }))
+    expect(result.ok).toBe(true)
+    expect((await getHandover(request.requestId)).status).toBe('Pending_Legal')
   })
 
   it('post_WithDeathCertificate_ReturnsVerificationIdAndMovesToPendingLegal', async () => {
@@ -191,6 +192,21 @@ describe('mock legal verification request', () => {
     const result = await requestLegalVerification(request.requestId, { verifierId: VERIFIER.userId, comment: 'ok', evidence: pdf('BangChung.pdf') })
     expect(typeof result.verificationId).toBe('number')
     expect((await getHandover(request.requestId)).status).toBe('Pending_Legal')
+  })
+
+  it('post_EvidenceWithSignature_IsAccepted', async () => {
+    const request = await createHandover(1)
+    await uploadDeathCertificate(request.requestId, { file: pdf() })
+    const result = await requestLegalVerification(request.requestId, { verifierId: VERIFIER.userId, evidence: pdf('BangChung.pdf'), signature: sig() })
+    expect(typeof result.verificationId).toBe('number')
+  })
+
+  it('post_EvidenceSignatureTooLarge_Returns400', async () => {
+    const request = await createHandover(1)
+    await uploadDeathCertificate(request.requestId, { file: pdf() })
+    const big = new File([new Uint8Array(16385)], 'big.sig')
+    const result = await attempt(() => requestLegalVerification(request.requestId, { verifierId: VERIFIER.userId, evidence: pdf('BangChung.pdf'), signature: big }))
+    expect(result.status).toBe(400)
   })
 
   it('post_SubmittingTwice_Returns409', async () => {
