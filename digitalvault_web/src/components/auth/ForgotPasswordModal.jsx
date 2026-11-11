@@ -16,11 +16,19 @@ const STEP_HELP = {
 
 function requestErrorMessage(error) {
   if (error?.status === 429) return 'Bạn đã thử quá nhiều lần. Vui lòng đợi 1 phút rồi thử lại.'
+  if (error?.status === 503) return 'Máy chủ chưa gửi được email xác nhận. Vui lòng thử lại sau.'
   return error?.message || GENERIC_ERROR
 }
 
+// BE không trả địa chỉ email đã che nên FE tự che từ email vừa nhập: a***n@domain
+function maskEmail(value) {
+  const [local = '', domain = ''] = value.trim().split('@')
+  if (!local || !domain) return value.trim()
+  return `${local[0]}***${local[local.length - 1]}@${domain}`
+}
+
 // Modal khôi phục mật khẩu 3 bước (email → mã OTP → mật khẩu mới). Chỉ mount khi mở.
-// BE chưa có API nên đang dùng mock; mockOtp chỉ hiển thị khi chạy mock để có thể demo không cần email thật.
+// mockOtp chỉ hiển thị khi chạy mock để có thể demo không cần email thật; với BE thật mã OTP được gửi qua email.
 export default function ForgotPasswordModal({ initialEmail = '', mockMode = MOCK_MODE, onClose, onReset }) {
   const [step, setStep] = useState('email')
   const [email, setEmail] = useState(initialEmail)
@@ -44,7 +52,7 @@ export default function ForgotPasswordModal({ initialEmail = '', mockMode = MOCK
     setSubmitError('')
     try {
       const result = await requestPasswordReset(email)
-      setChallenge({ maskedEmail: result.maskedEmail, mockOtp: result.mockOtp ?? '' })
+      setChallenge({ maskedEmail: maskEmail(email), mockOtp: result?.mockOtp ?? '' })
       setOtp('')
       setStep('otp')
     } catch (error) {
@@ -81,7 +89,7 @@ export default function ForgotPasswordModal({ initialEmail = '', mockMode = MOCK
     setBusy(true)
     setSubmitError('')
     try {
-      await resetPassword({ resetToken, ...passwords })
+      await resetPassword({ email, resetToken, ...passwords })
       onReset(email.trim())
     } catch (error) {
       setBusy(false)

@@ -190,17 +190,18 @@ const passwordResetHandlers = [
   ),
 
   http.post(
-    '*/api/auth/verify-reset-otp',
+    '*/api/auth/forgot-password/verify-otp',
     route(
       ({ body }) => {
-        if (hasUnknownFields(body, ['email', 'otp'])) return problem(400, 'Request contains fields outside the contract.')
+        if (hasUnknownFields(body, ['email', 'code'])) return problem(400, 'Request contains fields outside the contract.')
         const email = normalizeEmail(body?.email)
-        if (!email || typeof body?.otp !== 'string' || !/^\d{6}$/.test(body.otp.trim())) return problem(400, 'Email and a 6 digit code are required.')
+        if (!email || typeof body?.code !== 'string' || !/^\d{6}$/.test(body.code.trim())) return problem(400, 'Email and a 6 digit code are required.')
         const db = getDb()
         const record = db.passwordResets[email]
         if (!record || record.expiresAt < Date.now()) return problem(400, 'Invalid or expired code.')
-        if (record.attempts >= MAX_OTP_ATTEMPTS) return problem(429, 'Too many attempts. Request a new code.')
-        if (record.otp !== body.otp.trim()) {
+        // Như BE: mã sai, hết hạn hoặc đã thử quá 5 lần đều trả 400 chung
+        if (record.attempts >= MAX_OTP_ATTEMPTS) return problem(400, 'Invalid or expired code.')
+        if (record.otp !== body.code.trim()) {
           record.attempts += 1
           saveDb()
           return problem(400, 'Invalid or expired code.')
@@ -219,13 +220,16 @@ const passwordResetHandlers = [
     '*/api/auth/reset-password',
     route(
       ({ body }) => {
-        if (hasUnknownFields(body, ['resetToken', 'newPassword', 'confirmPassword'])) {
+        if (hasUnknownFields(body, ['email', 'resetToken', 'newPassword', 'confirmPassword'])) {
           return problem(400, 'Request contains fields outside the contract.')
         }
         const { resetToken, newPassword, confirmPassword } = body ?? {}
+        const email = normalizeEmail(body?.email)
+        if (!email) return problem(400, 'Email is required.')
         const db = getDb()
         const entry = typeof resetToken === 'string' ? db.resetTokens[resetToken] : null
-        if (!entry || entry.expiresAt < Date.now()) return problem(400, 'Invalid or expired reset token.')
+        // Như BE: mã đặt lại phải đúng của email này và còn hạn
+        if (!entry || entry.email !== email || entry.expiresAt < Date.now()) return problem(400, 'Invalid or expired reset token.')
         if (newPassword !== confirmPassword) return problem(400, 'Passwords do not match.')
         if (!isStrongPassword(newPassword)) return problem(400, 'Password must be 12 to 1024 characters with a digit and a symbol.')
         const account = db.users.find((user) => user.email.toLowerCase() === entry.email)

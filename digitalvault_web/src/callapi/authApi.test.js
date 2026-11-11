@@ -143,13 +143,13 @@ describe('authApi', () => {
   it('verifyResetOtp_EmailAndOtp_PostsTrimmedValues', async () => {
     axiosClient.post.mockResolvedValue({ data: { resetToken: 'abc' } })
     await expect(verifyResetOtp(' an@x.co ', ' 123456 ')).resolves.toEqual({ resetToken: 'abc' })
-    expect(axiosClient.post).toHaveBeenCalledWith('/auth/verify-reset-otp', { email: 'an@x.co', otp: '123456' }, { skipAuthRedirect: true })
+    expect(axiosClient.post).toHaveBeenCalledWith('/auth/forgot-password/verify-otp', { email: 'an@x.co', code: '123456' }, { skipAuthRedirect: true })
   })
 
   it('resetPassword_Values_PostsOnlyContractFields', async () => {
     axiosClient.post.mockResolvedValue({ data: undefined })
-    await resetPassword({ resetToken: 't', newPassword: 'a', confirmPassword: 'a', email: 'x' })
-    expect(axiosClient.post).toHaveBeenCalledWith('/auth/reset-password', { resetToken: 't', newPassword: 'a', confirmPassword: 'a' }, { skipAuthRedirect: true })
+    await resetPassword({ email: ' an@x.co ', resetToken: 't', newPassword: 'a', confirmPassword: 'a', role: 'Admin' })
+    expect(axiosClient.post).toHaveBeenCalledWith('/auth/reset-password', { email: 'an@x.co', resetToken: 't', newPassword: 'a', confirmPassword: 'a' }, { skipAuthRedirect: true })
   })
 
   it('register_WithPhone_SendsOnlyContractFields', async () => {

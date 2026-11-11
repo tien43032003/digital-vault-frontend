@@ -87,18 +87,19 @@ export async function checkSession() {
   }
 }
 
-// Quên mật khẩu (BE chưa có API, đang dùng mock). Ba bước: gửi mã OTP, xác nhận mã, đặt mật khẩu mới.
+// Quên mật khẩu (BE: IdentityService). Ba bước: gửi mã OTP qua email, xác nhận mã để nhận resetToken, đặt mật khẩu mới.
+// BE giới hạn: xin lại mã sau 60 giây (429), mã 6 số hết hạn và chỉ được thử sai tối đa 5 lần (đều trả 400), mật khẩu mới từ 12 ký tự.
 export async function requestPasswordReset(email) {
   const { data } = await axiosClient.post('/auth/forgot-password', { email: email.trim() }, AUTH_CONFIG)
   return data
 }
 
 export async function verifyResetOtp(email, otp) {
-  const { data } = await axiosClient.post('/auth/verify-reset-otp', { email: email.trim(), otp: otp.trim() }, AUTH_CONFIG)
+  const { data } = await axiosClient.post('/auth/forgot-password/verify-otp', { email: email.trim(), code: otp.trim() }, AUTH_CONFIG)
   return data
 }
 
 // Chỉ gửi đúng các trường hợp đồng; mật khẩu không bao giờ được log
-export async function resetPassword({ resetToken, newPassword, confirmPassword }) {
-  await axiosClient.post('/auth/reset-password', { resetToken, newPassword, confirmPassword }, AUTH_CONFIG)
+export async function resetPassword({ email, resetToken, newPassword, confirmPassword }) {
+  await axiosClient.post('/auth/reset-password', { email: email.trim(), resetToken, newPassword, confirmPassword }, AUTH_CONFIG)
 }

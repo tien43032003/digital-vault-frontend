@@ -92,6 +92,20 @@ describe('ForgotPasswordModal email step', () => {
     expect(await within(dialog()).findByRole('alert')).toHaveTextContent('Bạn đã thử quá nhiều lần. Vui lòng đợi 1 phút rồi thử lại.')
   })
 
+  it('send_EmailServiceNotConfigured503_ShowsReadableMessage', async () => {
+    server.use(http.post('*/api/auth/forgot-password', () => HttpResponse.json({ status: 503, detail: 'Dịch vụ gửi email OTP chưa được cấu hình.' }, { status: 503 })))
+    renderModal()
+    await sendCode()
+    expect(await within(dialog()).findByRole('alert')).toHaveTextContent('Máy chủ chưa gửi được email xác nhận. Vui lòng thử lại sau.')
+  })
+
+  it('send_BackendReplyHasNoMaskedEmail_StillShowsMaskedTypedEmail', async () => {
+    server.use(http.post('*/api/auth/forgot-password', () => HttpResponse.json({ expiresInSeconds: 300, message: 'Mã OTP đã được gửi.' })))
+    renderModal()
+    await reachOtpStep()
+    expect(dialog()).toHaveTextContent('o***r@example.com')
+  })
+
   it('cancel_Clicked_CallsOnClose', async () => {
     const props = renderModal()
     await userEvent.click(within(dialog()).getByRole('button', { name: 'Hủy' }))
@@ -132,7 +146,7 @@ describe('ForgotPasswordModal otp step', () => {
   })
 
   it('verify_TooManyAttempts_ShowsLockedMessage', async () => {
-    server.use(http.post('*/api/auth/verify-reset-otp', () => HttpResponse.json({ status: 429, detail: 'x' }, { status: 429 })))
+    server.use(http.post('*/api/auth/forgot-password/verify-otp', () => HttpResponse.json({ status: 429, detail: 'x' }, { status: 429 })))
     renderModal()
     await reachOtpStep()
     await userEvent.type(within(dialog()).getByLabelText(/^Mã xác nhận/), '123456')
@@ -203,6 +217,22 @@ describe('ForgotPasswordModal new password step', () => {
     await fill(NEW_PASSWORD)
     await vi.waitFor(() => expect(props.onReset).toHaveBeenCalledWith(DEMO_ACCOUNT.email))
     await expect(login(DEMO_ACCOUNT.email, NEW_PASSWORD)).resolves.toMatchObject({ userId: 1 })
+  })
+
+  it('reset_Valid_SendsEmailTogetherWithTheResetToken', async () => {
+    let received = null
+    server.use(
+      http.post('*/api/auth/reset-password', async ({ request }) => {
+        received = await request.json()
+        return HttpResponse.json({ message: 'ok' })
+      }),
+    )
+    renderModal()
+    await reachPasswordStep()
+    await fill(NEW_PASSWORD)
+    await vi.waitFor(() => expect(received).not.toBeNull())
+    expect(received).toMatchObject({ email: DEMO_ACCOUNT.email, newPassword: NEW_PASSWORD, confirmPassword: NEW_PASSWORD })
+    expect(typeof received.resetToken).toBe('string')
   })
 
   it('reset_ServerRejectsToken_ShowsExpiredMessage', async () => {

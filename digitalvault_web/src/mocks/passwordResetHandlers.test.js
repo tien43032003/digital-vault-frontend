@@ -24,8 +24,8 @@ const call = async (promise) => {
 
 const NEW_PASSWORD = 'MatKhauMoi#2026'
 const forgot = (email = DEMO_ACCOUNT.email, extra = {}) => call(axiosClient.post('/auth/forgot-password', { email, ...extra }))
-const verify = (email, otp) => call(axiosClient.post('/auth/verify-reset-otp', { email, otp }))
-const reset = (body) => call(axiosClient.post('/auth/reset-password', { newPassword: NEW_PASSWORD, confirmPassword: NEW_PASSWORD, ...body }))
+const verify = (email, code) => call(axiosClient.post('/auth/forgot-password/verify-otp', { email, code }))
+const reset = (body) => call(axiosClient.post('/auth/reset-password', { email: DEMO_ACCOUNT.email, newPassword: NEW_PASSWORD, confirmPassword: NEW_PASSWORD, ...body }))
 const login = (email, password) => call(axiosClient.post('/auth/login', { email, password }))
 
 async function getResetToken() {
@@ -100,11 +100,12 @@ describe('mock verify reset otp', () => {
     expect((await verify(DEMO_ACCOUNT.email, data.mockOtp)).status).toBe(400)
   })
 
-  it('post_TooManyWrongAttempts_Returns429EvenWithCorrectOtp', async () => {
+  it('post_TooManyWrongAttempts_Returns400EvenWithCorrectOtp', async () => {
     const { data } = await forgot()
     const wrong = data.mockOtp === '000000' ? '111111' : '000000'
     for (let i = 0; i < 5; i += 1) await verify(DEMO_ACCOUNT.email, wrong)
-    expect((await verify(DEMO_ACCOUNT.email, data.mockOtp)).status).toBe(429)
+    // BE trả 400 chung cho mã sai, hết hạn và quá 5 lần thử
+    expect((await verify(DEMO_ACCOUNT.email, data.mockOtp)).status).toBe(400)
   })
 
   it('post_OtpAlreadyUsed_Returns400', async () => {
@@ -115,7 +116,7 @@ describe('mock verify reset otp', () => {
 
   it('post_InvalidFormat_Returns400', async () => {
     expect((await verify(DEMO_ACCOUNT.email, 'abcdef')).status).toBe(400)
-    expect((await call(axiosClient.post('/auth/verify-reset-otp', { email: DEMO_ACCOUNT.email }))).status).toBe(400)
+    expect((await call(axiosClient.post('/auth/forgot-password/verify-otp', { email: DEMO_ACCOUNT.email }))).status).toBe(400)
   })
 })
 
@@ -150,6 +151,16 @@ describe('mock reset password', () => {
 
   it('post_UnknownField_Returns400', async () => {
     const resetToken = await getResetToken()
-    expect((await reset({ resetToken, email: 'x@example.com' })).status).toBe(400)
+    expect((await reset({ resetToken, role: 'Admin' })).status).toBe(400)
+  })
+
+  it('post_TokenBelongsToAnotherEmail_Returns400', async () => {
+    const resetToken = await getResetToken()
+    expect((await reset({ resetToken, email: 'nguoi.khac@example.com' })).status).toBe(400)
+  })
+
+  it('post_MissingEmail_Returns400', async () => {
+    const resetToken = await getResetToken()
+    expect((await call(axiosClient.post('/auth/reset-password', { resetToken, newPassword: NEW_PASSWORD, confirmPassword: NEW_PASSWORD }))).status).toBe(400)
   })
 })
