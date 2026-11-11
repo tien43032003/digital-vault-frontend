@@ -109,30 +109,116 @@ describe('SecuritySettingsPage profile', () => {
 })
 
 describe('SecuritySettingsPage change password', () => {
-  it('password_ValidInput_ChangesPasswordClearsFormAndShowsToast', async () => {
-    renderPage()
+  const sendCodeButton = (form) => within(form).getByRole('button', { name: 'Gửi mã xác nhận' })
+  const otpForm = () => screen.findByRole('form', { name: 'Xác nhận đổi mật khẩu' })
+  const typeOtp = async (form, code) => {
+    const input = within(form).getByLabelText(/^Mã xác nhận/)
+    await userEvent.clear(input)
+    if (code) await userEvent.type(input, code)
+  }
+
+  async function reachOtpStep(options) {
+    renderPage({ mockMode: 'full' })
     await waitForPage()
-    const form = await fillPasswordForm()
-    await userEvent.click(within(form).getByRole('button', { name: 'Đổi mật khẩu' }))
+    const form = await fillPasswordForm(options)
+    await userEvent.click(sendCodeButton(form))
+    return otpForm()
+  }
+
+  it('password_ValidInput_AsksForEmailCodeInsteadOfChangingImmediately', async () => {
+    const step = await reachOtpStep()
+    expect(step).toHaveTextContent('Mã xác nhận đã được gửi đến email của bạn')
+    // Chưa đổi mật khẩu cho tới khi nhập đúng mã
+    await expect(login(DEMO_ACCOUNT.email, DEMO_ACCOUNT.password)).resolves.toMatchObject({ userId: 1 })
+  })
+
+  it('password_CorrectCode_ChangesPasswordClearsFormAndShowsToast', async () => {
+    const step = await reachOtpStep()
+    await typeOtp(step, '123456')
+    await userEvent.click(within(step).getByRole('button', { name: 'Xác nhận đổi mật khẩu' }))
     expect(await screen.findByText('Đã đổi mật khẩu')).toBeInTheDocument()
+    const form = await screen.findByRole('form', { name: 'Đổi mật khẩu' })
     expect(within(form).getByLabelText(/Mật khẩu hiện tại/)).toHaveValue('')
     expect(within(form).getByLabelText(/^Mật khẩu mới/)).toHaveValue('')
     await expect(login(DEMO_ACCOUNT.email, NEW_PASSWORD)).resolves.toMatchObject({ userId: 1 })
   })
 
-  it('password_WrongCurrent_ShowsFieldError', async () => {
+  it('password_MockMode_ShowsDemoCodeButRealModeNever', async () => {
+    const step = await reachOtpStep()
+    expect(step).toHaveTextContent('Mã OTP mô phỏng: 123456')
+  })
+
+  it('password_RealMode_NeverShowsTheCodeEvenIfServerSendsIt', async () => {
+    renderPage({ mockMode: 'off' })
+    await waitForPage()
+    const form = await fillPasswordForm()
+    await userEvent.click(sendCodeButton(form))
+    const step = await otpForm()
+    expect(step).not.toHaveTextContent('Mã OTP mô phỏng')
+  })
+
+  it('password_WrongCode_ShowsFieldErrorAndKeepsOldPassword', async () => {
+    const step = await reachOtpStep()
+    await typeOtp(step, '000000')
+    await userEvent.click(within(step).getByRole('button', { name: 'Xác nhận đổi mật khẩu' }))
+    expect(await within(step).findByText('Mã OTP không đúng hoặc đã hết hạn.')).toBeInTheDocument()
+    await expect(login(DEMO_ACCOUNT.email, DEMO_ACCOUNT.password)).resolves.toMatchObject({ userId: 1 })
+  })
+
+  it('password_CodeNotSixDigits_ShowsErrorWithoutCallingApi', async () => {
+    const step = await reachOtpStep()
+    await typeOtp(step, '12ab')
+    await userEvent.click(within(step).getByRole('button', { name: 'Xác nhận đổi mật khẩu' }))
+    expect(await within(step).findByText('Mã gồm đúng 6 chữ số.')).toBeInTheDocument()
+  })
+
+  it('password_ResendCode_RequestsANewCodeThatWorks', async () => {
+    const step = await reachOtpStep()
+    await userEvent.click(within(step).getByRole('button', { name: 'Gửi lại mã' }))
+    expect(await within(step).findByText('Đã gửi lại mã xác nhận.')).toBeInTheDocument()
+    await typeOtp(step, '123456')
+    await userEvent.click(within(step).getByRole('button', { name: 'Xác nhận đổi mật khẩu' }))
+    expect(await screen.findByText('Đã đổi mật khẩu')).toBeInTheDocument()
+  })
+
+  it('password_Back_ReturnsToFormKeepingTypedValues', async () => {
+    const step = await reachOtpStep()
+    await userEvent.click(within(step).getByRole('button', { name: 'Quay lại' }))
+    const form = await screen.findByRole('form', { name: 'Đổi mật khẩu' })
+    expect(within(form).getByLabelText(/^Mật khẩu mới/)).toHaveValue(NEW_PASSWORD)
+  })
+
+  it('password_WrongCurrent_ShowsFieldErrorOnFirstStep', async () => {
     renderPage()
     await waitForPage()
     const form = await fillPasswordForm({ current: 'SaiMatKhau#123' })
-    await userEvent.click(within(form).getByRole('button', { name: 'Đổi mật khẩu' }))
+    await userEvent.click(sendCodeButton(form))
     expect(await within(form).findByText('Mật khẩu hiện tại không đúng.')).toBeInTheDocument()
+  })
+
+  it('password_RequestedTooSoon429_AsksToWait60Seconds', async () => {
+    server.use(http.post('*/api/auth/change-password/request', () => HttpResponse.json({ status: 429, detail: 'x' }, { status: 429 })))
+    renderPage()
+    await waitForPage()
+    const form = await fillPasswordForm()
+    await userEvent.click(sendCodeButton(form))
+    expect(await within(form).findByRole('alert')).toHaveTextContent('đợi 60 giây')
+  })
+
+  it('password_EmailServiceDown503_ExplainsEmailProblem', async () => {
+    server.use(http.post('*/api/auth/change-password/request', () => HttpResponse.json({ status: 503, detail: 'x' }, { status: 503 })))
+    renderPage()
+    await waitForPage()
+    const form = await fillPasswordForm()
+    await userEvent.click(sendCodeButton(form))
+    expect(await within(form).findByRole('alert')).toHaveTextContent('chưa gửi được email')
   })
 
   it('password_WeakNewPassword_ShowsRuleError', async () => {
     renderPage()
     await waitForPage()
     const form = await fillPasswordForm({ next: 'ngan' })
-    await userEvent.click(within(form).getByRole('button', { name: 'Đổi mật khẩu' }))
+    await userEvent.click(sendCodeButton(form))
     expect(await within(form).findByText('Mật khẩu tối thiểu 12 ký tự, có số và ký tự đặc biệt.')).toBeInTheDocument()
   })
 
@@ -140,7 +226,7 @@ describe('SecuritySettingsPage change password', () => {
     renderPage()
     await waitForPage()
     const form = await fillPasswordForm({ confirm: 'KhacHoanToan#2026' })
-    await userEvent.click(within(form).getByRole('button', { name: 'Đổi mật khẩu' }))
+    await userEvent.click(sendCodeButton(form))
     expect(await within(form).findByText('Mật khẩu xác nhận không khớp.')).toBeInTheDocument()
   })
 
@@ -148,7 +234,7 @@ describe('SecuritySettingsPage change password', () => {
     renderPage()
     await waitForPage()
     const form = await fillPasswordForm({ next: DEMO_ACCOUNT.password })
-    await userEvent.click(within(form).getByRole('button', { name: 'Đổi mật khẩu' }))
+    await userEvent.click(sendCodeButton(form))
     expect(await within(form).findByText('Mật khẩu mới phải khác mật khẩu hiện tại.')).toBeInTheDocument()
   })
 
@@ -158,7 +244,6 @@ describe('SecuritySettingsPage change password', () => {
     expect(screen.getByRole('region', { name: 'Đổi mật khẩu' })).toHaveTextContent('Đổi lần cuối')
   })
 })
-
 describe('SecuritySettingsPage two-factor', () => {
   it('twoFactor_Toggle_EnablesAndShowsToast', async () => {
     renderPage()

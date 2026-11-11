@@ -147,11 +147,6 @@ export async function updateProfile({ fullName, phone }) {
   return data
 }
 
-// Chỉ gửi đúng các trường hợp đồng; mật khẩu không bao giờ được log
-export async function changePassword({ currentPassword, newPassword, confirmPassword }) {
-  await axiosClient.post('/owner/change-password', { currentPassword, newPassword, confirmPassword })
-}
-
 export async function setTwoFactor(enabled) {
   const { data } = await axiosClient.put('/owner/security/two-factor', { enabled })
   return data

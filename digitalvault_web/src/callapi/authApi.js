@@ -103,3 +103,16 @@ export async function verifyResetOtp(email, otp) {
 export async function resetPassword({ email, resetToken, newPassword, confirmPassword }) {
   await axiosClient.post('/auth/reset-password', { email: email.trim(), resetToken, newPassword, confirmPassword }, AUTH_CONFIG)
 }
+
+// Đổi mật khẩu bước 1: BE kiểm tra mật khẩu hiện tại rồi gửi OTP 6 số qua email, trả { challengeId, expiresInSeconds, message }.
+// Mật khẩu không bao giờ được log; BE đặt tên trường mật khẩu cũ là oldPassword, mật khẩu mới tối thiểu 12 ký tự, xin lại mã sau 60 giây.
+export async function requestPasswordChange({ currentPassword, newPassword, confirmPassword }) {
+  const { data } = await axiosClient.post('/auth/change-password/request', { oldPassword: currentPassword, newPassword, confirmPassword })
+  return data
+}
+
+// Đổi mật khẩu bước 2: nhập OTP đã nhận qua email để BE đổi mật khẩu (tối đa 5 lần thử, hiệu lực 5 phút)
+export async function confirmPasswordChange(challengeId, code) {
+  const { data } = await axiosClient.post('/auth/change-password/confirm', { challengeId, code: code.trim() })
+  return data
+}

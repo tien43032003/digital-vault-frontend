@@ -1,15 +1,17 @@
 import { KeyRound, MonitorSmartphone, ShieldCheck, UserRound } from 'lucide-react'
 import { useCallback, useState } from 'react'
 import { Alert, Button, Form } from 'react-bootstrap'
-import { changePassword, setTwoFactor, updateProfile } from '../../callapi/ownerApi'
+import { confirmPasswordChange, requestPasswordChange } from '../../callapi/authApi'
+import { setTwoFactor, updateProfile } from '../../callapi/ownerApi'
 import AppToast from '../../components/common/AppToast'
 import MockNotice from '../../components/common/MockNotice'
 import TextField from '../../components/common/TextField'
 import { useSecuritySettings } from '../../hooks/useSecuritySettings'
 import { MOCK_MODE } from '../../mocks/mode'
+import { passwordConfirmError, passwordRequestError } from '../../utils/accountErrors'
 import { resultInfo } from '../../utils/activityLog'
 import { formatDateTime } from '../../utils/proofOfLife'
-import { validatePasswordChange, validateProfile } from '../../utils/validators'
+import { validateOtp, validatePasswordChange, validateProfile } from '../../utils/validators'
 
 const BADGE_CLASS = { ok: 'av-badge-ok', warn: 'av-badge-warn', info: 'av-badge-info', muted: 'av-badge-muted' }
 const EMPTY_PASSWORD_FORM = { currentPassword: '', newPassword: '', confirmPassword: '' }
@@ -104,42 +106,141 @@ function ProfileSection({ profile, onSaved }) {
   )
 }
 
-function PasswordSection({ passwordChangedAt, onChanged }) {
+function PasswordSection({ passwordChangedAt, onChanged, mockMode }) {
   const [form, setForm] = useState(EMPTY_PASSWORD_FORM)
   const [errors, setErrors] = useState({})
   const [save, setSave] = useState({ busy: false, error: '' })
+  // Bước 2 (nhập mã OTP gửi qua email): null khi đang ở bước nhập mật khẩu
+  const [challenge, setChallenge] = useState(null)
+  const [otp, setOtp] = useState('')
+  const [otpError, setOtpError] = useState('')
+  const [notice, setNotice] = useState('')
 
   const setValue = (name, value) => {
     setForm((prev) => ({ ...prev, [name]: value }))
     setErrors((prev) => ({ ...prev, [name]: undefined }))
   }
 
-  const handleSubmit = async (event) => {
-    event.preventDefault()
-    const nextErrors = validatePasswordChange(form)
-    setErrors(nextErrors)
-    if (Object.keys(nextErrors).length > 0) return
-
+  // BE kiểm tra mật khẩu hiện tại rồi gửi mã OTP về email; mật khẩu chỉ đổi sau khi nhập đúng mã
+  const requestCode = async ({ resend = false } = {}) => {
+    if (!resend) {
+      const nextErrors = validatePasswordChange(form)
+      setErrors(nextErrors)
+      if (Object.keys(nextErrors).length > 0) return
+    }
     setSave({ busy: true, error: '' })
+    setNotice('')
     try {
-      await changePassword(form)
+      const result = await requestPasswordChange(form)
+      setChallenge({ challengeId: result.challengeId, expiresInSeconds: result.expiresInSeconds, mockCode: result.mockCode ?? '' })
+      setOtp('')
+      setOtpError('')
+      if (resend) setNotice('Đã gửi lại mã xác nhận.')
+      setSave({ busy: false, error: '' })
+    } catch (error) {
+      const info = passwordRequestError(error)
+      if (info.field) setErrors({ [info.field]: info.message })
+      setSave({ busy: false, error: info.alert ?? '' })
+    }
+  }
+
+  const confirmCode = async () => {
+    const otpErrors = validateOtp(otp)
+    if (otpErrors.otp) {
+      setOtpError(otpErrors.otp)
+      return
+    }
+    setSave({ busy: true, error: '' })
+    setOtpError('')
+    try {
+      await confirmPasswordChange(challenge.challengeId, otp)
       setForm(EMPTY_PASSWORD_FORM)
+      setChallenge(null)
+      setOtp('')
       setSave({ busy: false, error: '' })
       onChanged()
     } catch (error) {
       setSave({ busy: false, error: '' })
-      if (error?.status === 403) setErrors({ currentPassword: 'Mật khẩu hiện tại không đúng.' })
-      else setSave({ busy: false, error: error?.message || GENERIC_ERROR })
+      setOtpError(passwordConfirmError(error))
     }
+  }
+
+  const goBack = () => {
+    setChallenge(null)
+    setOtp('')
+    setOtpError('')
+    setNotice('')
+    setSave({ busy: false, error: '' })
+  }
+
+  const subtitle = passwordChangedAt ? `Đổi lần cuối: ${formatDateTime(passwordChangedAt)}` : 'Bạn chưa từng đổi mật khẩu trên hệ thống này.'
+
+  if (challenge) {
+    const minutes = Math.max(1, Math.round((challenge.expiresInSeconds ?? 300) / 60))
+    return (
+      <section className="av-panel" aria-label="Đổi mật khẩu">
+        <SectionTitle icon={KeyRound}>Đổi mật khẩu</SectionTitle>
+        <p className="mb-3 fs-12 text-slate-500">{subtitle}</p>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault()
+            if (!save.busy) confirmCode()
+          }}
+          noValidate
+          aria-label="Xác nhận đổi mật khẩu"
+          className="d-flex flex-column gap-3"
+        >
+          <p className="mb-0 fs-13 text-slate-600">{`Mã xác nhận đã được gửi đến email của bạn. Nhập mã gồm 6 chữ số để hoàn tất; mã có hiệu lực ${minutes} phút.`}</p>
+          {mockMode === 'full' && challenge.mockCode && <p className="mb-0 fs-12 text-slate-500">{`Mã OTP mô phỏng: ${challenge.mockCode}`}</p>}
+          <TextField
+            id="password-otp"
+            name="otp"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            label="Mã xác nhận"
+            required
+            value={otp}
+            onChange={(event) => {
+              setOtp(event.target.value)
+              setOtpError('')
+            }}
+            error={otpError}
+          />
+          {notice && (
+            <p role="status" className="mb-0 fs-12 text-brand">
+              {notice}
+            </p>
+          )}
+          {save.error && <Alert variant="danger" className="av-alert mb-0">{save.error}</Alert>}
+          <div className="d-flex flex-wrap gap-2">
+            <Button type="submit" variant="primary" className="av-btn av-btn-md" disabled={save.busy}>
+              {save.busy ? 'Đang xử lý dữ liệu...' : 'Xác nhận đổi mật khẩu'}
+            </Button>
+            <Button type="button" variant="light" className="av-btn av-btn-md border" disabled={save.busy} onClick={() => requestCode({ resend: true })}>
+              Gửi lại mã
+            </Button>
+            <Button type="button" variant="light" className="av-btn av-btn-md border" disabled={save.busy} onClick={goBack}>
+              Quay lại
+            </Button>
+          </div>
+        </form>
+      </section>
+    )
   }
 
   return (
     <section className="av-panel" aria-label="Đổi mật khẩu">
       <SectionTitle icon={KeyRound}>Đổi mật khẩu</SectionTitle>
-      <p className="mb-3 fs-12 text-slate-500">
-        {passwordChangedAt ? `Đổi lần cuối: ${formatDateTime(passwordChangedAt)}` : 'Bạn chưa từng đổi mật khẩu trên hệ thống này.'}
-      </p>
-      <form onSubmit={handleSubmit} noValidate aria-label="Đổi mật khẩu" className="d-flex flex-column gap-3">
+      <p className="mb-3 fs-12 text-slate-500">{subtitle}</p>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault()
+          if (!save.busy) requestCode()
+        }}
+        noValidate
+        aria-label="Đổi mật khẩu"
+        className="d-flex flex-column gap-3"
+      >
         <TextField
           id="password-current"
           name="currentPassword"
@@ -174,17 +275,17 @@ function PasswordSection({ passwordChangedAt, onChanged }) {
           onChange={(event) => setValue('confirmPassword', event.target.value)}
           error={errors.confirmPassword}
         />
+        <p className="mb-0 fs-12 text-slate-500">Để bảo mật, hệ thống sẽ gửi mã xác nhận gồm 6 chữ số về email của bạn trước khi đổi mật khẩu.</p>
         {save.error && <Alert variant="danger" className="av-alert mb-0">{save.error}</Alert>}
         <div>
           <Button type="submit" variant="primary" className="av-btn av-btn-md" disabled={save.busy}>
-            {save.busy ? 'Đang xử lý dữ liệu...' : 'Đổi mật khẩu'}
+            {save.busy ? 'Đang xử lý dữ liệu...' : 'Gửi mã xác nhận'}
           </Button>
         </div>
       </form>
     </section>
   )
 }
-
 function TwoFactorSection({ enabled, onChanged }) {
   const [state, setState] = useState({ busy: false, error: '' })
 
@@ -298,6 +399,7 @@ export default function SecuritySettingsPage({ mockMode = MOCK_MODE }) {
         }}
       />
       <PasswordSection
+        mockMode={mockMode}
         passwordChangedAt={profile.passwordChangedAt}
         onChanged={() => {
           applyProfile({ passwordChangedAt: new Date().toISOString() })

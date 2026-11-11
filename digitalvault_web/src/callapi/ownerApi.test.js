@@ -9,7 +9,6 @@ import {
   getAssets,
   assignExecutor,
   cancelHandover,
-  changePassword,
   getActivityLogs,
   getBeneficiaries,
   getExecutorDetail,
@@ -322,12 +321,6 @@ describe('ownerApi', () => {
       axiosClient.put.mockResolvedValue({ data: { fullName: 'An' } })
       await updateProfile({ fullName: ' An ', phone: '  ' })
       expect(axiosClient.put).toHaveBeenCalledWith('/owner/profile', { fullName: 'An', phone: null })
-    })
-
-    it('changePassword_Values_PostsOnlyContractFields', async () => {
-      axiosClient.post.mockResolvedValue({ data: undefined })
-      await changePassword({ currentPassword: 'a', newPassword: 'b', confirmPassword: 'b', extra: 'x' })
-      expect(axiosClient.post).toHaveBeenCalledWith('/owner/change-password', { currentPassword: 'a', newPassword: 'b', confirmPassword: 'b' })
     })
 
     it('setTwoFactor_Enabled_PutsBoolean', async () => {

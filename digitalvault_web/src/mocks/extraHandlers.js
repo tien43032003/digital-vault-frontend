@@ -285,28 +285,6 @@ const securityHandlers = [
     }),
   ),
 
-  http.post(
-    '*/api/owner/change-password',
-    ownerRoute(({ userId, body }) => {
-      if (hasUnknownFields(body, ['currentPassword', 'newPassword', 'confirmPassword'])) {
-        return problem(400, 'Request contains fields outside the contract.')
-      }
-      const { currentPassword, newPassword, confirmPassword } = body ?? {}
-      if (typeof currentPassword !== 'string' || currentPassword === '') return problem(400, 'Current password is required.')
-      if (newPassword !== confirmPassword) return problem(400, 'Passwords do not match.')
-      if (!isStrongPassword(newPassword)) return problem(400, 'Password must be 12 to 1024 characters with a digit and a symbol.')
-      if (newPassword === currentPassword) return problem(400, 'New password must differ from the current one.')
-      const db = getDb()
-      const account = db.users.find((user) => user.userId === userId)
-      // Tài khoản ở BE thật không có mật khẩu trong mock nên không kiểm tra được, chỉ ghi nhận thao tác mô phỏng
-      if (account && account.password !== currentPassword) return problem(403, 'Current password is incorrect.')
-      if (account) account.password = newPassword
-      db.security[userId] = { ...db.security[userId], passwordChangedAt: new Date().toISOString() }
-      saveDb()
-      return new HttpResponse(null, { status: 204 })
-    }),
-  ),
-
   http.put(
     '*/api/owner/security/two-factor',
     ownerRoute(({ userId, body }) => {
@@ -321,4 +299,69 @@ const securityHandlers = [
   ),
 ]
 
-export const extraHandlers = [...activityLogHandlers, ...executorHandlers, ...legalApprovalSimulation, ...securityHandlers, ...passwordResetHandlers]
+// Đổi mật khẩu bằng OTP email, bám IdentityService của BE: bước 1 kiểm tra mật khẩu hiện tại rồi gửi mã, bước 2 nhập mã để đổi.
+// mockCode chỉ có ở mock để demo (BE thật gửi mã qua email và không trả về).
+const CHANGE_OTP_CODE = '123456'
+const CHANGE_OTP_TTL_SECONDS = 300
+const CHANGE_MAX_ATTEMPTS = 5
+
+const passwordChallenges = () => {
+  const db = getDb()
+  db.passwordChallenges ??= {}
+  return db.passwordChallenges
+}
+
+const accountPasswordHandlers = [
+  http.post(
+    '*/api/auth/change-password/request',
+    route(({ userId, body }) => {
+      if (hasUnknownFields(body, ['oldPassword', 'newPassword', 'confirmPassword'])) return problem(400, 'Request contains fields outside the contract.')
+      const { oldPassword, newPassword, confirmPassword } = body ?? {}
+      if (typeof oldPassword !== 'string' || !oldPassword) return problem(400, 'OldPassword is required.')
+      if (typeof newPassword !== 'string' || newPassword.length < 12 || newPassword.length > 1024) return problem(400, 'NewPassword must be 12 to 1024 characters.')
+      if (newPassword !== confirmPassword) return problem(400, 'Mật khẩu mới và mật khẩu xác nhận không khớp.')
+      if (newPassword === oldPassword) return problem(400, 'Mật khẩu mới không được trùng với mật khẩu hiện tại.')
+      const user = getDb().users.find((item) => item.userId === userId)
+      if (!user || user.password !== oldPassword) return problem(400, 'Mật khẩu hiện tại không chính xác.')
+
+      // Mỗi người dùng chỉ có một challenge còn hiệu lực: yêu cầu mới thay thế yêu cầu cũ
+      const store = passwordChallenges()
+      Object.keys(store)
+        .filter((id) => store[id].userId === userId)
+        .forEach((id) => delete store[id])
+      const challengeId = Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join('')
+      store[challengeId] = { userId, newPassword, expiresAt: Date.now() + CHANGE_OTP_TTL_SECONDS * 1000, attempts: 0 }
+      saveDb()
+      return HttpResponse.json({ challengeId, expiresInSeconds: CHANGE_OTP_TTL_SECONDS, message: 'Mã OTP xác nhận đã được gửi đến email của bạn.', mockCode: CHANGE_OTP_CODE })
+    }),
+  ),
+
+  http.post(
+    '*/api/auth/change-password/confirm',
+    route(({ userId, body }) => {
+      if (hasUnknownFields(body, ['challengeId', 'code']) || !/^[0-9a-f]{32}$/.test(body?.challengeId ?? '') || !/^\d{6}$/.test(body?.code ?? '')) {
+        return problem(400, 'ChallengeId and a 6-digit code are required.')
+      }
+      const store = passwordChallenges()
+      const state = store[body.challengeId]
+      // Như BE: mã sai, hết hạn hoặc quá 5 lần thử đều trả 400 chung
+      if (!state || state.userId !== userId || state.expiresAt <= Date.now() || state.attempts >= CHANGE_MAX_ATTEMPTS) return problem(400, 'Mã OTP không hợp lệ hoặc đã hết hạn.')
+      state.attempts += 1
+      if (body.code !== CHANGE_OTP_CODE) {
+        saveDb()
+        return problem(400, 'Mã OTP không chính xác.')
+      }
+      delete store[body.challengeId]
+      const db = getDb()
+      const user = db.users.find((item) => item.userId === userId)
+      user.password = state.newPassword
+      db.security[userId] = { ...db.security[userId], passwordChangedAt: new Date().toISOString() }
+      saveDb()
+      return HttpResponse.json({ message: 'Đổi mật khẩu thành công.' })
+    }),
+  ),
+]
+export const extraHandlers = [...activityLogHandlers, ...executorHandlers, ...legalApprovalSimulation, ...securityHandlers]
+
+// Quên mật khẩu và đổi mật khẩu bằng OTP đã có trên BE thật nên chỉ mock ở chế độ mock đầy đủ, chế độ hybrid gọi thẳng BE
+export const passwordHandlers = [...passwordResetHandlers, ...accountPasswordHandlers]

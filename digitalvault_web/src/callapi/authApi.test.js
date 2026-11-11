@@ -2,9 +2,11 @@ import { clearTokens, getTokens, setTokens } from '../utils/tokenStorage'
 import axiosClient from './axiosClient'
 import {
   checkSession,
+  confirmPasswordChange,
   login,
   logout,
   register,
+  requestPasswordChange,
   requestPasswordReset,
   resendTwoFactor,
   resetPassword,
@@ -152,6 +154,17 @@ describe('authApi', () => {
     expect(axiosClient.post).toHaveBeenCalledWith('/auth/reset-password', { email: 'an@x.co', resetToken: 't', newPassword: 'a', confirmPassword: 'a' }, { skipAuthRedirect: true })
   })
 
+  it('requestPasswordChange_Values_PostsOldPasswordFieldNameOfBackend', async () => {
+    axiosClient.post.mockResolvedValue({ data: { challengeId: 'c'.repeat(32), expiresInSeconds: 300, message: 'ok' } })
+    await expect(requestPasswordChange({ currentPassword: 'Cu#123456789', newPassword: 'Moi#123456789', confirmPassword: 'Moi#123456789', extra: 'x' })).resolves.toMatchObject({ challengeId: 'c'.repeat(32), expiresInSeconds: 300 })
+    expect(axiosClient.post).toHaveBeenCalledWith('/auth/change-password/request', { oldPassword: 'Cu#123456789', newPassword: 'Moi#123456789', confirmPassword: 'Moi#123456789' })
+  })
+
+  it('confirmPasswordChange_ChallengeAndCode_PostsTrimmedCode', async () => {
+    axiosClient.post.mockResolvedValue({ data: { message: 'ok' } })
+    await confirmPasswordChange('c'.repeat(32), ' 123456 ')
+    expect(axiosClient.post).toHaveBeenCalledWith('/auth/change-password/confirm', { challengeId: 'c'.repeat(32), code: '123456' })
+  })
   it('register_WithPhone_SendsOnlyContractFields', async () => {
     axiosClient.post.mockResolvedValue({ data: { userId: 1 } })
     await register({

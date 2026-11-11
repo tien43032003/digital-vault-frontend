@@ -70,7 +70,8 @@ export function describeRequest({ method, url }, status, data) {
   const executorRevoke = verb === 'post' ? VAULT_EXECUTOR_REVOKE.exec(path) : null
   if (executorRevoke) return { action: 'RevokeExecutor', entityType: 'DigitalVault', entityId: Number(executorRevoke[1]), result: 'Success' }
   if (verb === 'put' && path === '/owner/profile') return { action: 'UpdateProfile', result: 'Success' }
-  if (verb === 'post' && path === '/owner/change-password') return { action: 'ChangePassword', result: 'Success' }
+  // Chỉ bước xác nhận OTP mới thật sự đổi mật khẩu nên mới ghi nhật ký
+  if (verb === 'post' && path === '/auth/change-password/confirm') return { action: 'ChangePassword', result: 'Success' }
   if (verb === 'put' && path === '/owner/security/two-factor') return { action: 'ToggleTwoFactor', result: 'Success' }
   if (verb === 'post' && path === '/owner/life-confirmation') return { action: 'ConfirmAlive', result: 'Success' }
   return null

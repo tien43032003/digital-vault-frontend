@@ -66,7 +66,8 @@ describe('describeRequest', () => {
 
   it('describeRequest_ProfileAndPasswordChanges_ReturnActions', () => {
     expect(run('put', '/owner/profile', 200)).toMatchObject({ action: 'UpdateProfile' })
-    expect(run('post', '/owner/change-password', 204)).toMatchObject({ action: 'ChangePassword' })
+    expect(run('post', '/auth/change-password/confirm', 200)).toMatchObject({ action: 'ChangePassword' })
+    expect(run('post', '/auth/change-password/request', 200)).toBeNull()
     expect(run('put', '/owner/security/two-factor', 200)).toMatchObject({ action: 'ToggleTwoFactor' })
   })
 

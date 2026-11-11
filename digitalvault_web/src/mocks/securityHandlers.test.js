@@ -23,9 +23,6 @@ const call = async (promise) => {
   }
 }
 
-const NEW_PASSWORD = 'MatKhauMoi#2026'
-const changePassword = (body) =>
-  call(axiosClient.post('/owner/change-password', { currentPassword: DEMO_ACCOUNT.password, newPassword: NEW_PASSWORD, confirmPassword: NEW_PASSWORD, ...body }))
 
 describe('mock profile', () => {
   it('get_DemoAccount_ReturnsProfileWithSecuritySettings', async () => {
@@ -69,36 +66,6 @@ describe('mock profile', () => {
   })
 })
 
-describe('mock change password', () => {
-  it('post_ValidInput_Returns204AndNewPasswordWorks', async () => {
-    expect((await changePassword({})).status).toBe(204)
-    const profile = (await axiosClient.get('/owner/profile')).data
-    expect(Date.now() - new Date(profile.passwordChangedAt).getTime()).toBeLessThan(60_000)
-    expect((await call(axiosClient.post('/auth/login', { email: DEMO_ACCOUNT.email, password: NEW_PASSWORD }))).status).toBe(200)
-    expect((await call(axiosClient.post('/auth/login', { email: DEMO_ACCOUNT.email, password: DEMO_ACCOUNT.password }))).status).toBe(401)
-  })
-
-  it('post_WrongCurrentPassword_Returns403', async () => {
-    expect((await changePassword({ currentPassword: 'SaiMatKhau#123' })).status).toBe(403)
-  })
-
-  it('post_ConfirmMismatch_Returns400', async () => {
-    expect((await changePassword({ confirmPassword: 'KhongKhop#2026x' })).status).toBe(400)
-  })
-
-  it.each([['ngan#1'], ['KhongCoSoDacBiet'], ['KhongCoKyTuDacBiet1']])('post_WeakNewPassword_Returns400', async (weak) => {
-    expect((await changePassword({ newPassword: weak, confirmPassword: weak })).status).toBe(400)
-  })
-
-  it('post_SameAsCurrent_Returns400', async () => {
-    expect((await changePassword({ newPassword: DEMO_ACCOUNT.password, confirmPassword: DEMO_ACCOUNT.password })).status).toBe(400)
-  })
-
-  it('post_UnknownField_Returns400', async () => {
-    expect((await changePassword({ role: 'Admin' })).status).toBe(400)
-  })
-})
-
 describe('mock two-factor', () => {
   it('put_Enable_ReturnsStateAndProfileReflectsIt', async () => {
     const result = await call(axiosClient.put('/owner/security/two-factor', { enabled: true }))
@@ -133,9 +100,5 @@ describe('mock profile in hybrid mode', () => {
   it('put_RealBackendUser_KeepsEditsInMockOverlay', async () => {
     await axiosClient.put('/owner/profile', { fullName: 'Người Thật', phone: null })
     expect((await axiosClient.get('/owner/profile')).data.fullName).toBe('Người Thật')
-  })
-
-  it('post_ChangePasswordRealBackendUser_IsAcceptedWithoutTouchingRealAccount', async () => {
-    expect((await changePassword({ currentPassword: 'BatKyMatKhau#1' })).status).toBe(204)
   })
 })
