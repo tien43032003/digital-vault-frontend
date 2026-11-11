@@ -6,6 +6,7 @@ import { useAdminList } from '../../hooks/useAdminList'
 import { useAdminResource } from '../../hooks/useAdminResource'
 import { SUBSCRIBER_STATUSES, currentMonthKey, formatVnd, subscriberStatusInfo } from '../../utils/payment'
 import { formatDate } from '../../utils/proofOfLife'
+import { describeSubscription } from '../../utils/subscriptionStatus'
 import AdminPager from './AdminPager'
 import AdminResourceState from './AdminResourceState'
 
@@ -30,7 +31,15 @@ function PlanSubscribersModal({ plan, onClose }) {
   const [status, setStatus] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
-  const fetchPage = useMemo(() => (params) => getPlanSubscribers(plan.planId, params), [plan.planId])
+  // Đóng dấu giờ lúc tải lên từng dòng để trạng thái và số ngày còn lại nhất quán trong cả bảng
+  const fetchPage = useMemo(
+    () => async (params) => {
+      const data = await getPlanSubscribers(plan.planId, params)
+      const fetchedAt = Date.now()
+      return { ...data, items: (data.items ?? []).map((item) => ({ ...item, fetchedAt })) }
+    },
+    [plan.planId],
+  )
   const params = useMemo(() => ({ page, pageSize, status }), [page, pageSize, status])
   const { items, error, loading, reload } = useAdminList(fetchPage, params)
 
@@ -90,11 +99,15 @@ function PlanSubscribersModal({ plan, onClose }) {
                   <th scope="col">Trạng thái</th>
                   <th scope="col">Ngày sử dụng</th>
                   <th scope="col">Ngày hết hạn</th>
+                  <th scope="col">Còn lại</th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((item) => {
-                  const info = subscriberStatusInfo(item.status)
+                  // Gói đang dùng mà còn tối đa 5 ngày thì báo "Sắp đến hạn" để Admin nhắc gia hạn
+                  const state = describeSubscription(item, item.fetchedAt)
+                  const info = state.key === 'expiring' ? { text: 'Sắp đến hạn', tone: 'caution' } : subscriberStatusInfo(item.status)
+                  const showDaysLeft = item.status === 'Active' && (state.key === 'active' || state.key === 'expiring')
                   return (
                     <tr key={item.subscriptionId}>
                       <td>
@@ -106,6 +119,7 @@ function PlanSubscribersModal({ plan, onClose }) {
                       </td>
                       <td className="text-nowrap">{formatDate(item.startDate)}</td>
                       <td className="text-nowrap">{formatDate(item.endDate)}</td>
+                      <td className="text-nowrap">{showDaysLeft ? `Còn ${state.daysLeft} ngày` : '—'}</td>
                     </tr>
                   )
                 })}
